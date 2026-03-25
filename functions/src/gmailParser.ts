@@ -90,14 +90,13 @@ export const pollGmail = functions.pubsub.schedule('every 15 minutes').onRun(asy
         const parsed = parseOpenTableEmail(subject, body);
         if (!parsed) continue;
 
-        // Check for duplicate
-        const existing = await db.collection(`pendingDinners/${uid}/items`)
-          .where('rawSubject', '==', subject)
-          .limit(1)
-          .get();
-        if (!existing.empty) continue;
+        // Use a hash of the message ID as doc ID to avoid duplicates with a single get
+        const docId = Buffer.from(msg.id).toString('base64url').slice(0, 32);
+        const docRef = db.doc(`pendingDinners/${uid}/items/${docId}`);
+        const existing = await docRef.get();
+        if (existing.exists) continue;
 
-        await db.collection(`pendingDinners/${uid}/items`).add({
+        await docRef.set({
           ...parsed,
           detectedAt: admin.firestore.FieldValue.serverTimestamp(),
         });

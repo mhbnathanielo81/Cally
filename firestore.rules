@@ -20,11 +20,12 @@ service cloud.firestore {
       allow read, write: if isAuth() && isOwner(uid);
     }
 
-    // Couples: members can read; only user1 can create; updates by members
+    // Couples: members or pending-status lookup for join flow
     match /couples/{coupleId} {
       allow read: if isAuth() && (
         resource.data.user1 == request.auth.uid ||
-        resource.data.user2 == request.auth.uid
+        resource.data.user2 == request.auth.uid ||
+        resource.data.status == 'pending'
       );
       allow create: if isAuth() && request.resource.data.user1 == request.auth.uid;
       allow update: if isAuth() && (
@@ -32,11 +33,6 @@ service cloud.firestore {
         resource.data.user2 == request.auth.uid ||
         (resource.data.status == 'pending' && request.resource.data.user2 == request.auth.uid)
       );
-    }
-
-    // Invite code lookup (unauthenticated join flow needs to query)
-    match /couples/{coupleId} {
-      allow read: if isAuth();
     }
 
     // Events: couple members only

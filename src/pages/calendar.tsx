@@ -22,7 +22,6 @@ export default function CalendarPage() {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<CallyEvent | null>(null);
   const [showCoupleModal, setShowCoupleModal] = useState(false);
-  const [refreshProfile, setRefreshProfile] = useState(0);
 
   const coupleId = profile?.coupleId ?? null;
   const { events } = useEvents(coupleId);
@@ -50,7 +49,6 @@ export default function CalendarPage() {
 
   const handleCoupleLinked = useCallback(async () => {
     setShowCoupleModal(false);
-    setRefreshProfile((n) => n + 1);
     await refreshProfile();
   }, [refreshProfile]);
 

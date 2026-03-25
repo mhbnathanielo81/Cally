@@ -68,14 +68,10 @@ export async function createCouple(user: User): Promise<string> {
     user2DisplayName: null,
     user2PhotoURL: null,
     inviteCode,
-    status: 'pending',
+    status: 'pending' as const,
     createdAt: serverTimestamp(),
     linkedAt: null,
     updatedAt: serverTimestamp(),
-  } satisfies Omit<Couple, 'createdAt' | 'updatedAt' | 'linkedAt'> & {
-    createdAt: ReturnType<typeof serverTimestamp>;
-    updatedAt: ReturnType<typeof serverTimestamp>;
-    linkedAt: null;
   });
   await updateDoc(doc(db, 'users', user.uid), { coupleId, updatedAt: serverTimestamp() });
   return inviteCode;
@@ -91,8 +87,10 @@ export async function joinCouple(user: User, inviteCode: string): Promise<void> 
   if (snaps.empty) throw new Error('Invalid or expired invite code.');
   const coupleDoc = snaps.docs[0];
   const couple = coupleDoc.data() as Couple;
-  // Check expiry (24 hours)
-  const created = (couple.createdAt as Timestamp).toDate();
+  // Check expiry (24 hours) — createdAt is a server Timestamp on reads
+  const createdAt = couple.createdAt as Timestamp | null;
+  if (!createdAt) throw new Error('Invalid invite code data.');
+  const created = createdAt.toDate();
   if (Date.now() - created.getTime() > 24 * 60 * 60 * 1000) {
     throw new Error('Invite code has expired.');
   }
