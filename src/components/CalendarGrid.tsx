@@ -88,7 +88,7 @@ export default function CalendarGrid({ month, year, events, currentUid, onDayCli
                     onClick={(e) => { e.stopPropagation(); onEventClick(ev); }}
                     style={{
                       background: getEventColor(ev.createdBy, currentUid, ev.type),
-                      color: ev.type === 'dinner' || ev.createdBy !== currentUid ? '#000' : '#000',
+                      color: '#000',
                       borderRadius: 4,
                       padding: '2px 6px',
                       fontSize: '0.7rem',

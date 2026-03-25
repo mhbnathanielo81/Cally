@@ -13,7 +13,7 @@ import { CallyEvent } from '@/types';
 import { requestNotificationPermission, setupForegroundMessages } from '@/lib/messaging';
 
 export default function CalendarPage() {
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading, refreshProfile } = useAuth();
   const router = useRouter();
 
   const now = new Date();
@@ -48,12 +48,11 @@ export default function CalendarPage() {
     }
   }, [user]);
 
-  const handleCoupleLinked = useCallback(() => {
+  const handleCoupleLinked = useCallback(async () => {
     setShowCoupleModal(false);
     setRefreshProfile((n) => n + 1);
-    // Force auth hook to re-fetch profile
-    window.location.reload();
-  }, []);
+    await refreshProfile();
+  }, [refreshProfile]);
 
   if (authLoading) {
     return (

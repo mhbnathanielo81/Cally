@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { User } from 'firebase/auth';
 import { onAuthChange } from '@/lib/auth';
 import { getUserProfile } from '@/lib/firestore';
@@ -8,6 +8,7 @@ export interface AuthState {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
+  refreshProfile: () => Promise<void>;
 }
 
 export function useAuth(): AuthState {
@@ -29,5 +30,11 @@ export function useAuth(): AuthState {
     return unsub;
   }, []);
 
-  return { user, profile, loading };
+  const refreshProfile = useCallback(async () => {
+    if (!user) return;
+    const p = await getUserProfile(user.uid);
+    setProfile(p);
+  }, [user]);
+
+  return { user, profile, loading, refreshProfile };
 }
