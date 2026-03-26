@@ -29,6 +29,7 @@ const baseProps = {
   events: [] as CallyEvent[],
   currentUid: 'user-me',
   onDayClick: jest.fn(),
+  onAddEventClick: jest.fn(),
   onEventClick: jest.fn(),
 };
 

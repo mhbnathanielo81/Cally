@@ -10,6 +10,7 @@ import {
   extractLocationFromQuery,
   creatorLabel,
   describeEvent,
+  parseDayQuery,
   answer,
 } from '@/lib/callyEngine';
 import { CallyEvent, Couple } from '@/types';
@@ -362,5 +363,112 @@ describe('answer — chronological ordering of results', () => {
     const morning = resp.indexOf('Morning Coffee');
     const afternoon = resp.indexOf('Afternoon Meeting');
     expect(morning).toBeLessThan(afternoon);
+  });
+});
+
+// ── parseDayQuery ─────────────────────────────────────────────────────────────
+
+describe('parseDayQuery', () => {
+  it('parses "March 27th"', () => {
+    expect(parseDayQuery('what events do I have on march 27th')).toEqual({ monthNum: 3, day: 27 });
+  });
+
+  it('parses "March 27" (no ordinal)', () => {
+    expect(parseDayQuery('explain what events i have on march 27')).toEqual({ monthNum: 3, day: 27 });
+  });
+
+  it('parses "27th of March"', () => {
+    expect(parseDayQuery('what is happening on the 27th of march')).toEqual({ monthNum: 3, day: 27 });
+  });
+
+  it('parses "27 March"', () => {
+    expect(parseDayQuery('events on 27 march')).toEqual({ monthNum: 3, day: 27 });
+  });
+
+  it('parses "January 1st"', () => {
+    expect(parseDayQuery('what is on january 1st')).toEqual({ monthNum: 1, day: 1 });
+  });
+
+  it('returns null for a bare month name (no day number)', () => {
+    expect(parseDayQuery('list events in june')).toBeNull();
+  });
+
+  it('returns null for unrelated queries', () => {
+    expect(parseDayQuery('how many events do i have')).toBeNull();
+  });
+});
+
+// ── answer() — specific day queries ──────────────────────────────────────────
+
+describe('answer — specific day queries', () => {
+  const events = [
+    makeEvent({ id: 'e1', title: 'Morning Run', day: 27, month: 3, year: 2026, time: '7:00 AM', createdBy: MY_UID }),
+    makeEvent({ id: 'e2', title: 'Lunch Meeting', day: 27, month: 3, year: 2026, time: '12:00 PM', createdBy: PARTNER_UID }),
+    makeEvent({ id: 'e3', title: 'Other Day Event', day: 28, month: 3, year: 2026, time: '9:00 AM', createdBy: MY_UID }),
+  ];
+
+  it('returns only March 27 events (not all of March)', () => {
+    const resp = answer('explain what events I have on march 27th', events, MY_UID, fakeCouple, 'Alex');
+    expect(resp).toContain('Morning Run');
+    expect(resp).toContain('Lunch Meeting');
+    expect(resp).not.toContain('Other Day Event');
+  });
+
+  it('mentions the correct count for that day', () => {
+    const resp = answer('what is on march 27', events, MY_UID, fakeCouple, 'Alex');
+    expect(resp).toContain('2 events');
+    expect(resp).toContain('March 27');
+  });
+
+  it('returns sorted events (morning before afternoon)', () => {
+    const resp = answer('events on march 27th 2026', events, MY_UID, fakeCouple, 'Alex');
+    const morning = resp.indexOf('Morning Run');
+    const lunch = resp.indexOf('Lunch Meeting');
+    expect(morning).toBeLessThan(lunch);
+  });
+
+  it('reports no events when the day is clear', () => {
+    const resp = answer('what is on march 5th', events, MY_UID, fakeCouple, 'Alex');
+    expect(resp).toContain('no events');
+    expect(resp).toContain('March 5');
+  });
+
+  it('does NOT return all-March events when a specific day is asked', () => {
+    // Previously Cally would answer with "You have N events in March" — ensure it no longer does
+    const resp = answer('what events do I have on march 27th', events, MY_UID, fakeCouple, 'Alex');
+    expect(resp).not.toMatch(/events? in March/i);
+  });
+});
+
+// ── answer() — weekend availability ──────────────────────────────────────────
+
+describe('answer — weekend availability', () => {
+  it('shows free and busy weekends for a given month', () => {
+    // March 2026: weekends on 7-8, 14-15, 21-22, 28-29
+    const events = [
+      makeEvent({ id: 'e1', title: 'Sat Event', day: 7, month: 3, year: 2026, time: '10:00 AM' }),
+    ];
+    const resp = answer('what free weekends do we have in march 2026', events, MY_UID, null, 'Alex');
+    expect(resp).toContain('Weekend availability in March 2026');
+    expect(resp).toMatch(/📅.*March 7/);      // busy weekend
+    expect(resp).toMatch(/✓.*March 14/);      // free weekend
+    expect(resp).toMatch(/✓.*March 21/);      // free weekend
+    expect(resp).toMatch(/✓.*March 28/);      // free weekend
+  });
+
+  it('reports free and busy counts', () => {
+    const events = [
+      makeEvent({ id: 'e1', day: 7, month: 3, year: 2026 }),
+    ];
+    const resp = answer('free weekends in march 2026', events, MY_UID, null, 'Alex');
+    expect(resp).toContain('3 free');
+    expect(resp).toContain('1 with events');
+  });
+
+  it('handles a month with no events (all free)', () => {
+    const resp = answer('what weekends are free in april 2026', [], MY_UID, null, 'Alex');
+    expect(resp).toContain('Weekend availability in April 2026');
+    expect(resp).not.toMatch(/📅/); // no busy weekends
+    expect(resp).toContain('0 with events');
   });
 });

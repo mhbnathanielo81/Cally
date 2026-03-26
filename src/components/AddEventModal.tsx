@@ -57,8 +57,19 @@ export default function AddEventModal({ coupleId, createdBy, day, month, year, o
         {error && <p style={{ color: '#e53e3e', marginBottom: 12, fontSize: '0.9rem' }}>{error}</p>}
         <form onSubmit={handleSubmit}>
           <div className="field">
-            <label>Title *</label>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title" autoFocus />
+            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <span>Title *</span>
+              <span style={{ fontWeight: 400, fontSize: '0.78rem', color: title.length >= 50 ? '#e53e3e' : 'var(--color-muted)' }}>
+                {title.length}/50
+              </span>
+            </label>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value.slice(0, 50))}
+              placeholder="Event title"
+              autoFocus
+              maxLength={50}
+            />
           </div>
           <div className="field">
             <label>Time</label>
