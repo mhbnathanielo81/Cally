@@ -87,4 +87,21 @@ describe('CalendarGrid', () => {
     render(<CalendarGrid {...baseProps} events={events} />);
     expect(screen.queryByText('Future Event')).not.toBeInTheDocument();
   });
+
+  it('renders same-day events in chronological order (earliest first)', () => {
+    const events = [
+      makeEvent({ id: 'e1', title: '1PM Meeting', time: '1:00 PM', day: 5 }),
+      makeEvent({ id: 'e2', title: '9AM Coffee', time: '9:00 AM', day: 5 }),
+      makeEvent({ id: 'e3', title: '11AM Call',  time: '11:00 AM', day: 5 }),
+    ];
+    const { container } = render(<CalendarGrid {...baseProps} events={events} />);
+
+    // Grab the text content of all event pill buttons (they share a day-5 cell)
+    const pills = Array.from(container.querySelectorAll('button')).filter((btn) =>
+      ['9AM Coffee', '11AM Call', '1PM Meeting'].includes(btn.textContent ?? '')
+    );
+    const titles = pills.map((btn) => btn.textContent);
+
+    expect(titles).toEqual(['9AM Coffee', '11AM Call', '1PM Meeting']);
+  });
 });
