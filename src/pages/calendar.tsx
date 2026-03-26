@@ -30,7 +30,7 @@ export default function CalendarPage() {
   const [showCoupleModal, setShowCoupleModal] = useState(false);
 
   const coupleId = profile?.coupleId ?? null;
-  const { events } = useEvents(coupleId);
+  const { events } = useEvents(coupleId || user?.uid || null);
   const { couple } = useCouple(coupleId);
 
   // Redirect unauthenticated users
@@ -86,12 +86,12 @@ export default function CalendarPage() {
     type: 'event' | 'dinner';
   }) {
     const db = getDbInstance();
-    if (!db || !user || !coupleId) {
+    if (!db || !user) {
       throw new Error('Not connected');
     }
     await addDoc(collection(db, 'events'), {
       ...eventData,
-      coupleId,
+      coupleId: coupleId || user.uid,
       createdBy: user.uid,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),

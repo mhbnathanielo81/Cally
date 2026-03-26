@@ -1,52 +1,8 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function isAuth() {
-      return request.auth != null;
-    }
-
-    function isOwner(uid) {
-      return request.auth.uid == uid;
-    }
-
-    function isCoupleMembers(coupleId) {
-      let couple = get(/databases/$(database)/documents/couples/$(coupleId)).data;
-      return request.auth.uid == couple.user1 || request.auth.uid == couple.user2;
-    }
-
-    // Users: only owner can read/write their own profile
-    match /users/{uid} {
-      allow read, write: if isAuth() && isOwner(uid);
-    }
-
-    // Couples: members or pending-status lookup for join flow
-    match /couples/{coupleId} {
-      allow read: if isAuth() && (
-        resource.data.user1 == request.auth.uid ||
-        resource.data.user2 == request.auth.uid ||
-        resource.data.status == 'pending'
-      );
-      allow create: if isAuth() && request.resource.data.user1 == request.auth.uid;
-      allow update: if isAuth() && (
-        resource.data.user1 == request.auth.uid ||
-        resource.data.user2 == request.auth.uid ||
-        (resource.data.status == 'pending' && request.resource.data.user2 == request.auth.uid)
-      );
-    }
-
-    // Events: couple members only
-    match /events/{eventId} {
-      allow read: if isAuth() && isCoupleMembers(resource.data.coupleId);
-      allow create: if isAuth() && isCoupleMembers(request.resource.data.coupleId)
-                    && request.resource.data.createdBy == request.auth.uid;
-      allow update: if isAuth() && resource.data.createdBy == request.auth.uid;
-      allow delete: if isAuth() && resource.data.createdBy == request.auth.uid;
-    }
-
-    // Pending dinners: user owns their own
-    match /pendingDinners/{userId}/{dinner=**} {
-      allow read, write: if isAuth() && isOwner(userId);
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }

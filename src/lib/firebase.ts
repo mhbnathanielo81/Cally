@@ -17,7 +17,8 @@ const firebaseConfig = {
 let app: FirebaseApp | null = null;
 let _auth: Auth | null = null;
 let _db: Firestore | null = null;
-let _emulatorsConnected = false;
+let _authEmulatorConnected = false;
+let _firestoreEmulatorConnected = false;
 
 function getFirebaseApp(): FirebaseApp {
   if (!app) {
@@ -29,9 +30,9 @@ function getFirebaseApp(): FirebaseApp {
 export function getAuthInstance(): Auth {
   if (!_auth) {
     _auth = getAuth(getFirebaseApp());
-    if (process.env.NEXT_PUBLIC_USE_EMULATORS === 'true' && !_emulatorsConnected) {
+    if (process.env.NEXT_PUBLIC_USE_EMULATORS === 'true' && !_authEmulatorConnected) {
       connectAuthEmulator(_auth, 'http://127.0.0.1:9099', { disableWarnings: true });
-      _emulatorsConnected = true;
+      _authEmulatorConnected = true;
     }
   }
   return _auth;
@@ -40,9 +41,9 @@ export function getAuthInstance(): Auth {
 export function getDbInstance(): Firestore {
   if (!_db) {
     _db = getFirestore(getFirebaseApp());
-    if (process.env.NEXT_PUBLIC_USE_EMULATORS === 'true' && !_emulatorsConnected) {
+    if (process.env.NEXT_PUBLIC_USE_EMULATORS === 'true' && !_firestoreEmulatorConnected) {
       connectFirestoreEmulator(_db, '127.0.0.1', 8080);
-      _emulatorsConnected = true;
+      _firestoreEmulatorConnected = true;
     }
   }
   return _db;
