@@ -107,30 +107,54 @@ export default function CallyAssistant({ events, currentUid, couple, currentUser
 
       {/* Chat panel */}
       {open && (
-        <div style={{ width: '100%', maxWidth: 720, maxHeight: 280, overflowY: 'auto', padding: '0 16px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {messages.map((msg, i) => (
-            <div
-              key={i}
+        <div style={{ width: '100%', maxWidth: 720, padding: '0 16px 12px' }}>
+          {/* Close bar */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+            <button
+              onClick={() => setOpen(false)}
+              aria-label="Close Cally chat"
               style={{
-                alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                background: msg.role === 'user' ? CHAT_GREEN : 'var(--color-bg)',
-                border: `1px solid ${msg.role === 'user' ? CALLY_GREEN : 'var(--color-border)'}`,
-                borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                padding: '8px 14px',
-                fontSize: '0.82rem',
-                lineHeight: 1.6,
-                maxWidth: '88%',
-                whiteSpace: 'pre-wrap',
-                color: 'var(--color-text)',
+                background: 'none',
+                border: '1px solid var(--color-border)',
+                borderRadius: 6,
+                padding: '2px 10px',
+                cursor: 'pointer',
+                fontSize: '0.78rem',
+                color: 'var(--color-muted)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
               }}
             >
-              {msg.role === 'cally' && (
-                <span style={{ fontWeight: 700, color: CALLY_GREEN, marginRight: 4 }}>Cally:</span>
-              )}
-              {msg.text}
-            </div>
-          ))}
-          <div ref={bottomRef} />
+              ✕ Close
+            </button>
+          </div>
+          {/* Messages */}
+          <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {messages.map((msg, i) => (
+              <div
+                key={i}
+                style={{
+                  alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                  background: msg.role === 'user' ? CHAT_GREEN : 'var(--color-bg)',
+                  border: `1px solid ${msg.role === 'user' ? CALLY_GREEN : 'var(--color-border)'}`,
+                  borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                  padding: '8px 14px',
+                  fontSize: '0.82rem',
+                  lineHeight: 1.6,
+                  maxWidth: '88%',
+                  whiteSpace: 'pre-wrap',
+                  color: 'var(--color-text)',
+                }}
+              >
+                {msg.role === 'cally' && (
+                  <span style={{ fontWeight: 700, color: CALLY_GREEN, marginRight: 4 }}>Cally:</span>
+                )}
+                {msg.text}
+              </div>
+            ))}
+            <div ref={bottomRef} />
+          </div>
         </div>
       )}
     </div>

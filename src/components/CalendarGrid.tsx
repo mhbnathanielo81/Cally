@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { CallyEvent } from '@/types';
 import { getEventColor } from '@/lib/colors';
 
@@ -10,10 +10,13 @@ interface Props {
   events: CallyEvent[];
   currentUid: string;
   onDayClick: (day: number) => void;
+  onAddEventClick: (day: number) => void;
   onEventClick: (event: CallyEvent) => void;
 }
 
-export default function CalendarGrid({ month, year, events, currentUid, onDayClick, onEventClick }: Props) {
+export default function CalendarGrid({ month, year, events, currentUid, onDayClick, onAddEventClick, onEventClick }: Props) {
+  const [hoveredDay, setHoveredDay] = useState<number | null>(null);
+
   const { days, startOffset } = useMemo(() => {
     const d = new Date(year, month - 1, 1);
     const startOffset = d.getDay();
@@ -66,21 +69,26 @@ export default function CalendarGrid({ month, year, events, currentUid, onDayCli
           }
           const dayEvents = eventsByDay[day] ?? [];
           const isToday = isCurrentMonth && day === today.getDate();
+          const isHovered = hoveredDay === day;
           return (
             <div
               key={day}
               onClick={() => onDayClick(day)}
+              onMouseEnter={() => setHoveredDay(day)}
+              onMouseLeave={() => setHoveredDay(null)}
               style={{
                 background: 'var(--color-bg)',
                 minHeight: 100,
                 padding: '6px',
                 cursor: 'pointer',
                 border: '1px solid transparent',
+                borderColor: isHovered ? 'var(--color-primary)' : 'transparent',
                 transition: 'border-color 0.15s',
+                position: 'relative',
+                overflow: 'hidden',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--color-primary)')}
-              onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'transparent')}
             >
+              {/* Day number */}
               <span style={{
                 display: 'inline-block',
                 width: 26,
@@ -95,7 +103,39 @@ export default function CalendarGrid({ month, year, events, currentUid, onDayCli
               }}>
                 {day}
               </span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4 }}>
+
+              {/* Hover "+" add button */}
+              {isHovered && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onAddEventClick(day); }}
+                  title="Add event"
+                  style={{
+                    position: 'absolute',
+                    top: 4,
+                    right: 4,
+                    width: 22,
+                    height: 22,
+                    borderRadius: '50%',
+                    background: 'var(--color-primary)',
+                    border: 'none',
+                    color: '#000',
+                    fontSize: '1rem',
+                    lineHeight: '22px',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    padding: 0,
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  +
+                </button>
+              )}
+
+              {/* Event pills */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4, minWidth: 0 }}>
                 {dayEvents.slice(0, 3).map((ev) => (
                   <button
                     key={ev.id}
@@ -111,7 +151,9 @@ export default function CalendarGrid({ month, year, events, currentUid, onDayCli
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                       width: '100%',
+                      minWidth: 0,
                       fontWeight: 600,
+                      display: 'block',
                     }}
                   >
                     {ev.title}

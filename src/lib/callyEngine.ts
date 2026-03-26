@@ -86,6 +86,45 @@ export function extractLocationFromQuery(q: string): string | null {
   return null;
 }
 
+// ── specific-day parsing ──────────────────────────────────────────────────────
+
+/**
+ * Detect a "Month Day" reference in the query (e.g. "March 27th", "27th of March").
+ * Returns the 1-based month number and day, or null if no match.
+ */
+export function parseDayQuery(q: string): { monthNum: number; day: number } | null {
+  for (let i = 0; i < MONTH_NAMES.length; i++) {
+    const name = MONTH_NAMES[i].toLowerCase();
+    if (!q.includes(name)) continue;
+
+    // "March 27" / "March 27th"
+    const afterMatch = q.match(new RegExp(`${name}\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, 'i'));
+    if (afterMatch) return { monthNum: i + 1, day: parseInt(afterMatch[1], 10) };
+
+    // "27th of March" / "27 March"
+    const beforeMatch = q.match(new RegExp(`(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?${name}\\b`, 'i'));
+    if (beforeMatch) return { monthNum: i + 1, day: parseInt(beforeMatch[1], 10) };
+  }
+  return null;
+}
+
+// ── weekend helpers ───────────────────────────────────────────────────────────
+
+/** Return all Sat+Sun weekend pairs that have a Saturday in the given month+year. */
+function getWeekendsInMonth(monthNum: number, year: number): Array<{ sat: number; sun: number | null }> {
+  const daysInMonth = new Date(year, monthNum, 0).getDate();
+  const weekends: Array<{ sat: number; sun: number | null }> = [];
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    if (new Date(year, monthNum - 1, d).getDay() === 6) {
+      // Saturday found — pair with following Sunday if it's still in the same month
+      const sun = d + 1 <= daysInMonth ? d + 1 : null;
+      weekends.push({ sat: d, sun });
+    }
+  }
+  return weekends;
+}
+
 // ── core query engine ─────────────────────────────────────────────────────────
 
 /** Sort comparator: ascending by date then time. */
@@ -146,7 +185,58 @@ export function answer(
     return `Here are all your events:\n\n${lines.join('\n')}${more}`;
   }
 
-  // ── 5. Events by month (checked before location to avoid "events in June" → location) ──
+  // ── 5. Specific-day queries — must come before month-only handler ───────────
+  const dayQuery = parseDayQuery(q);
+  if (dayQuery) {
+    const { monthNum, day } = dayQuery;
+    const yearForDay = targetYear ?? currentYear;
+    const monthName = MONTH_NAMES[monthNum - 1];
+    const dayEvents = events
+      .filter((e) => e.month === monthNum && e.day === day && e.year === yearForDay)
+      .sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+
+    if (dayEvents.length === 0) {
+      return `You have no events on ${monthName} ${day}, ${yearForDay}. That day is wide open!`;
+    }
+    const lines = dayEvents.map((e) => describeEvent(e, currentUid, couple, currentUserName));
+    return (
+      `You have ${dayEvents.length} event${dayEvents.length !== 1 ? 's' : ''} on ${monthName} ${day}, ${yearForDay}:\n\n` +
+      lines.join('\n')
+    );
+  }
+
+  // ── 6. Weekend availability — must come before month-only handler ───────────
+  if (/weekend/.test(q)) {
+    const monthIdx = MONTH_NAMES.findIndex((m) => q.includes(m.toLowerCase()));
+    if (monthIdx >= 0) {
+      const monthNum = monthIdx + 1;
+      const yearForWeekend = targetYear ?? currentYear;
+      const monthName = MONTH_NAMES[monthIdx];
+      const weekends = getWeekendsInMonth(monthNum, yearForWeekend);
+      const eventDays = new Set(
+        events
+          .filter((e) => e.month === monthNum && e.year === yearForWeekend)
+          .map((e) => e.day),
+      );
+
+      const lines = weekends.map(({ sat, sun }) => {
+        const days: number[] = sun !== null ? [sat, sun] : [sat];
+        const hasBusy = days.some((d) => eventDays.has(d));
+        const dateRange = days.length === 2 ? `${monthName} ${days[0]}–${days[1]}` : `${monthName} ${days[0]}`;
+        return hasBusy ? `📅 ${dateRange}: has events` : `✓  ${dateRange}: free`;
+      });
+
+      const freeCount = lines.filter((l) => l?.startsWith('✓')).length;
+      const busyCount = lines.filter((l) => l?.startsWith('📅')).length;
+      return (
+        `Weekend availability in ${monthName} ${yearForWeekend}:\n\n` +
+        lines.join('\n') +
+        `\n\n${freeCount} free · ${busyCount} with events`
+      );
+    }
+  }
+
+  // ── 7. Events by month (checked after day/weekend to avoid misrouting) ──────
   const monthIdx = MONTH_NAMES.findIndex((m) => q.includes(m.toLowerCase()));
   if (monthIdx >= 0) {
     const monthNum = monthIdx + 1;
@@ -159,7 +249,7 @@ export function answer(
     return `You have ${byMonth.length} event${byMonth.length !== 1 ? 's' : ''} in ${MONTH_NAMES[monthIdx]}:\n\n${lines.join('\n')}`;
   }
 
-  // ── 6. My events vs partner events ──────────────────────────────────────────
+  // ── 8. My events vs partner events ──────────────────────────────────────────
   if (/my events|events i (added|created)/.test(q)) {
     const mine = pool.filter((e) => e.createdBy === currentUid);
     if (mine.length === 0) return "You haven't added any events yet.";
@@ -173,7 +263,7 @@ export function answer(
     return `Your partner's events (${theirs.length}):\n\n${lines.join('\n')}`;
   }
 
-  // ── 7. Next upcoming event ──────────────────────────────────────────────────
+  // ── 9. Next upcoming event ──────────────────────────────────────────────────
   if (/next event|upcoming/.test(q)) {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -184,7 +274,7 @@ export function answer(
     return `Your next event is:\n\n${describeEvent(upcoming[0], currentUid, couple, currentUserName)}`;
   }
 
-  // ── 8. Location queries (checked late so month names don't get eaten) ────────
+  // ── 10. Location queries (checked late so month names don't get eaten) ───────
   const locationPattern = extractLocationFromQuery(q);
   if (locationPattern) {
     const matched = pool.filter(
@@ -207,9 +297,11 @@ export function answer(
     );
   }
 
-  // ── 9. Help / catch-all ─────────────────────────────────────────────────────
+  // ── 11. Help / catch-all ────────────────────────────────────────────────────
   return (
     "Hi! I'm Cally 💚 I can help you explore your calendar. Try asking me:\n" +
+    '• "What events do I have on March 27th?"\n' +
+    '• "What free weekends do we have in April?"\n' +
     '• "How many times are we going to Michigan this year?"\n' +
     '• "List all events in June"\n' +
     '• "What is my next upcoming event?"\n' +
@@ -217,3 +309,4 @@ export function answer(
     '• "How many events do we have in 2026?"'
   );
 }
+

@@ -110,6 +110,14 @@ describe('CallyAssistant — opening the chat panel', () => {
     fireEvent.click(mascotBtn); // close
     expect(screen.queryByText(/Ask me anything about your calendar/)).not.toBeInTheDocument();
   });
+
+  it('closes the chat panel when the ✕ Close button is clicked', () => {
+    render(<CallyAssistant {...baseProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /ask cally/i })); // open
+    expect(screen.getByText(/Ask me anything about your calendar/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /close cally chat/i }));
+    expect(screen.queryByText(/Ask me anything about your calendar/)).not.toBeInTheDocument();
+  });
 });
 
 // ── submitting a question ─────────────────────────────────────────────────────
