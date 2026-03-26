@@ -6,12 +6,13 @@ import {
   onAuthStateChanged,
   User,
 } from 'firebase/auth';
-import { auth } from './firebase';
+import { getAuthInstance } from './firebase';
 import { upsertUser } from './firestore';
 
 const provider = new GoogleAuthProvider();
 
 export async function signInWithGoogle(): Promise<void> {
+  const auth = getAuthInstance();
   try {
     const result = await signInWithPopup(auth, provider);
     await upsertUser(result.user);
@@ -30,9 +31,9 @@ export async function signInWithGoogle(): Promise<void> {
 }
 
 export async function signOut(): Promise<void> {
-  await firebaseSignOut(auth);
+  await firebaseSignOut(getAuthInstance());
 }
 
 export function onAuthChange(callback: (user: User | null) => void) {
-  return onAuthStateChanged(auth, callback);
+  return onAuthStateChanged(getAuthInstance(), callback);
 }

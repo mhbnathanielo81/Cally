@@ -14,11 +14,12 @@ import {
   getDocs,
 } from 'firebase/firestore';
 import { User } from 'firebase/auth';
-import { db } from './firebase';
+import { getDbInstance } from './firebase';
 import { CallyEvent, Couple, UserProfile, AddEventPayload } from '@/types';
 
 /* ---- Users ---- */
 export async function upsertUser(user: User): Promise<void> {
+  const db = getDbInstance();
   const ref = doc(db, 'users', user.uid);
   const snap = await getDoc(ref);
   if (!snap.exists()) {
@@ -42,11 +43,13 @@ export async function upsertUser(user: User): Promise<void> {
 }
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
+  const db = getDbInstance();
   const snap = await getDoc(doc(db, 'users', uid));
   return snap.exists() ? (snap.data() as UserProfile) : null;
 }
 
 export async function updateFcmToken(uid: string, token: string): Promise<void> {
+  const db = getDbInstance();
   await updateDoc(doc(db, 'users', uid), { fcmToken: token, updatedAt: serverTimestamp() });
 }
 
@@ -56,6 +59,7 @@ function generateInviteCode(): string {
 }
 
 export async function createCouple(user: User): Promise<string> {
+  const db = getDbInstance();
   const coupleRef = doc(collection(db, 'couples'));
   const inviteCode = generateInviteCode();
   const coupleId = coupleRef.id;
@@ -78,6 +82,7 @@ export async function createCouple(user: User): Promise<string> {
 }
 
 export async function joinCouple(user: User, inviteCode: string): Promise<void> {
+  const db = getDbInstance();
   const q = query(
     collection(db, 'couples'),
     where('inviteCode', '==', inviteCode),
@@ -111,6 +116,7 @@ export async function joinCouple(user: User, inviteCode: string): Promise<void> 
 }
 
 export function subscribeToCouple(coupleId: string, callback: (couple: Couple | null) => void) {
+  const db = getDbInstance();
   return onSnapshot(doc(db, 'couples', coupleId), (snap) => {
     callback(snap.exists() ? (snap.data() as Couple) : null);
   });
@@ -118,6 +124,7 @@ export function subscribeToCouple(coupleId: string, callback: (couple: Couple | 
 
 /* ---- Events ---- */
 export async function addEvent(coupleId: string, createdBy: string, payload: AddEventPayload): Promise<string> {
+  const db = getDbInstance();
   const ref = await addDoc(collection(db, 'events'), {
     coupleId,
     createdBy,
@@ -130,14 +137,17 @@ export async function addEvent(coupleId: string, createdBy: string, payload: Add
 }
 
 export async function updateEvent(eventId: string, payload: Partial<AddEventPayload>): Promise<void> {
+  const db = getDbInstance();
   await updateDoc(doc(db, 'events', eventId), { ...payload, updatedAt: serverTimestamp() });
 }
 
 export async function deleteEvent(eventId: string): Promise<void> {
+  const db = getDbInstance();
   await deleteDoc(doc(db, 'events', eventId));
 }
 
 export function subscribeToEvents(coupleId: string, callback: (events: CallyEvent[]) => void) {
+  const db = getDbInstance();
   const q = query(collection(db, 'events'), where('coupleId', '==', coupleId));
   return onSnapshot(q, (snap) => {
     const events = snap.docs.map((d) => ({ id: d.id, ...d.data() } as CallyEvent));
