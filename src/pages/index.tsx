@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/hooks/useAuth';
 import { signInWithGoogle } from '@/lib/auth';
@@ -31,7 +32,9 @@ export default function SignInPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: 32, padding: 24 }}>
       <div style={{ textAlign: 'center' }}>
-        <h1 style={{ fontSize: '3rem', margin: '0 0 8px', fontWeight: 800, color: 'var(--color-primary)' }}>Cally</h1>
+        <Link href="/about" style={{ textDecoration: 'none' }}>
+          <h1 style={{ fontSize: '3rem', margin: '0 0 8px', fontWeight: 800, color: 'var(--color-primary)', cursor: 'pointer' }}>Cally</h1>
+        </Link>
         <p style={{ color: 'var(--color-muted)', margin: 0, fontSize: '1.1rem' }}>Your shared calendar, together.</p>
       </div>
       <button
