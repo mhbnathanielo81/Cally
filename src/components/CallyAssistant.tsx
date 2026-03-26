@@ -289,15 +289,5 @@ export default function CallyAssistant({
   );
 }
 
-interface Props {
-  events: CallyEvent[];
-  currentUid: string;
-  couple: Couple | null;
-  currentUserName: string;
-}
 
-interface Message {
-  role: 'user' | 'cally';
-  text: string;
-}
 

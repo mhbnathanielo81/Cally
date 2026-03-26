@@ -38,13 +38,6 @@ export default function CalendarPage() {
     if (!authLoading && !user) router.push('/');
   }, [user, authLoading, router]);
 
-  // Show couple modal if not linked
-  useEffect(() => {
-    if (!authLoading && user && profile && !profile.coupleId) {
-      setShowCoupleModal(true);
-    }
-  }, [authLoading, user, profile]);
-
   // Request notification permission
   useEffect(() => {
     if (user) {
@@ -71,15 +64,13 @@ export default function CalendarPage() {
 
   const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-  /** Open day-detail view; guard if not paired. */
+  /** Open day-detail view for any authenticated user. */
   function handleDayClick(d: number) {
-    if (!profile?.coupleId) { setShowCoupleModal(true); return; }
     setSelectedDay(d);
   }
 
-  /** Open add-event modal directly; guard if not paired. */
+  /** Open add-event modal for any authenticated user. */
   function handleAddEventClick(d: number) {
-    if (!profile?.coupleId) { setShowCoupleModal(true); return; }
     setAddEventDay(d);
   }
 
@@ -189,9 +180,9 @@ export default function CalendarPage() {
           onEventClick={(ev) => setSelectedEvent(ev)}
         />
       )}
-      {addEventDay && coupleId && (
+      {addEventDay && (
         <AddEventModal
-          coupleId={coupleId}
+          coupleId={coupleId ?? user.uid}
           createdBy={user.uid}
           day={addEventDay}
           month={month}
