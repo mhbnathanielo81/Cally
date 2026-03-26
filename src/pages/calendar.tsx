@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { useAuth } from '@/hooks/useAuth';
 import { useEvents } from '@/hooks/useEvents';
 import { useCouple } from '@/hooks/useCouple';
@@ -14,6 +15,7 @@ import ProfileMenu from '@/components/ProfileMenu';
 import CallyAssistant from '@/components/CallyAssistant';
 import { CallyEvent } from '@/types';
 import { requestNotificationPermission, setupForegroundMessages } from '@/lib/messaging';
+import { getDbInstance } from '@/lib/firebase';
 
 export default function CalendarPage() {
   const { user, profile, loading: authLoading, refreshProfile } = useAuth();
@@ -81,6 +83,30 @@ export default function CalendarPage() {
     setAddEventDay(d);
   }
 
+  /** Create an event from Cally AI chat. */
+  async function handleCallyCreateEvent(eventData: {
+    title: string;
+    day: number;
+    month: number;
+    year: number;
+    time: string;
+    location: string;
+    notes: string;
+    type: 'event' | 'dinner';
+  }) {
+    const db = getDbInstance();
+    if (!db || !user || !coupleId) {
+      throw new Error('Not connected');
+    }
+    await addDoc(collection(db, 'events'), {
+      ...eventData,
+      coupleId,
+      createdBy: user.uid,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    });
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       {/* Header */}
@@ -121,6 +147,7 @@ export default function CalendarPage() {
         currentUid={user.uid}
         couple={couple}
         currentUserName={profile?.displayName ?? user.displayName ?? 'you'}
+        onCreateEvent={handleCallyCreateEvent}
       />
 
       {/* Body */}

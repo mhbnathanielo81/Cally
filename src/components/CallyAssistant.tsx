@@ -1,40 +1,92 @@
 import { useState, useRef, useEffect, KeyboardEvent } from 'react';
 import { CallyEvent, Couple } from '@/types';
-import { answer } from '@/lib/callyEngine';
+import { askCally, ChatMessage, CallyResponse } from '@/lib/callyAI';
+
+interface NewEventData {
+  title: string;
+  day: number;
+  month: number;
+  year: number;
+  time: string;
+  location: string;
+  notes: string;
+  type: 'event' | 'dinner';
+}
 
 interface Props {
   events: CallyEvent[];
   currentUid: string;
   couple: Couple | null;
   currentUserName: string;
+  onCreateEvent: (event: NewEventData) => Promise<void>;
 }
 
-interface Message {
-  role: 'user' | 'cally';
-  text: string;
-}
-
-// ── Component ─────────────────────────────────────────────────────────────────
-
-export default function CallyAssistant({ events, currentUid, couple, currentUserName }: Props) {
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'cally', text: "Hi! I'm Cally 💚 Ask me anything about your calendar!" },
+export default function CallyAssistant({
+  events,
+  currentUid,
+  couple,
+  currentUserName,
+  onCreateEvent,
+}: Props) {
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { role: 'cally', text: "Hi! I'm Cally 💚 Ask me anything about your calendar, or tell me to add an event!" },
   ]);
   const [input, setInput] = useState('');
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, open]);
 
-  function submit() {
+  async function submit() {
     const q = input.trim();
-    if (!q) return;
-    const userMsg: Message = { role: 'user', text: q };
-    const callyMsg: Message = { role: 'cally', text: answer(q, events, currentUid, couple, currentUserName) };
-    setMessages((prev) => [...prev, userMsg, callyMsg]);
+    if (!q || loading) return;
+
+    const userMsg: ChatMessage = { role: 'user', text: q };
+    setMessages((prev) => [...prev, userMsg]);
     setInput('');
+    setLoading(true);
+
+    try {
+      // Pass conversation history (last 10 messages = 5 exchanges) for memory
+      const historyForContext = [...messages, userMsg].slice(-10);
+      const response: CallyResponse = await askCally(
+        q,
+        events,
+        currentUid,
+        couple,
+        currentUserName,
+        historyForContext,
+      );
+
+      // Handle event creation
+      if (response.action === 'create_event' && response.event) {
+        try {
+          await onCreateEvent(response.event);
+          const callyMsg: ChatMessage = { role: 'cally', text: response.reply };
+          setMessages((prev) => [...prev, callyMsg]);
+        } catch {
+          const errorMsg: ChatMessage = {
+            role: 'cally',
+            text: "I tried to create that event but something went wrong. Please try again! 💚",
+          };
+          setMessages((prev) => [...prev, errorMsg]);
+        }
+      } else {
+        const callyMsg: ChatMessage = { role: 'cally', text: response.reply };
+        setMessages((prev) => [...prev, callyMsg]);
+      }
+    } catch {
+      const errorMsg: ChatMessage = {
+        role: 'cally',
+        text: "Something went wrong. Please try again! 💚",
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    }
+
+    setLoading(false);
   }
 
   function onKey(e: KeyboardEvent<HTMLInputElement>) {
@@ -46,33 +98,76 @@ export default function CallyAssistant({ events, currentUid, couple, currentUser
   const CHAT_GREEN = 'rgba(29,185,84,0.18)';
 
   return (
-    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'var(--color-surface)', borderBottom: open ? '1px solid var(--color-border)' : 'none' }}>
+    <div
+      style={{
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        background: 'var(--color-surface)',
+        borderBottom: open ? '1px solid var(--color-border)' : 'none',
+      }}
+    >
       {/* Input bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', width: '100%', maxWidth: 720 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '8px 16px',
+          width: '100%',
+          maxWidth: 720,
+        }}
+      >
         {/* Mascot */}
         <button
           onClick={() => setOpen((o) => !o)}
           title="Ask Cally"
           aria-label="Ask Cally"
-          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center' }}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+          }}
         >
           <img
             src="https://github.com/user-attachments/assets/20c66a0d-843c-4c14-9fc1-6aaa399d2f7c"
             alt="Cally"
             width={36}
             height={46}
-            style={{ borderRadius: 8, objectFit: 'cover', border: `2px solid ${CALLY_GREEN}`, boxShadow: `0 0 8px rgba(29,185,84,0.4)` }}
+            style={{
+              borderRadius: 8,
+              objectFit: 'cover',
+              border: `2px solid ${CALLY_GREEN}`,
+              boxShadow: `0 0 8px rgba(29,185,84,0.4)`,
+            }}
           />
         </button>
 
         {/* Input */}
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', background: LIGHT_GREEN_BG, border: `1.5px solid ${CALLY_GREEN}`, borderRadius: 24, overflow: 'hidden', padding: '0 4px 0 14px' }}>
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            background: LIGHT_GREEN_BG,
+            border: `1.5px solid ${CALLY_GREEN}`,
+            borderRadius: 24,
+            overflow: 'hidden',
+            padding: '0 4px 0 14px',
+          }}
+        >
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onKey}
             onFocus={() => setOpen(true)}
             placeholder="Ask Cally about your calendar…"
+            disabled={loading}
             style={{
               flex: 1,
               background: 'transparent',
@@ -81,11 +176,12 @@ export default function CallyAssistant({ events, currentUid, couple, currentUser
               color: 'var(--color-text)',
               fontSize: '0.88rem',
               padding: '7px 0',
+              opacity: loading ? 0.5 : 1,
             }}
           />
           <button
             onClick={submit}
-            disabled={!input.trim()}
+            disabled={!input.trim() || loading}
             style={{
               background: CALLY_GREEN,
               border: 'none',
@@ -94,13 +190,13 @@ export default function CallyAssistant({ events, currentUid, couple, currentUser
               color: '#000',
               fontWeight: 700,
               fontSize: '0.8rem',
-              cursor: input.trim() ? 'pointer' : 'default',
-              opacity: input.trim() ? 1 : 0.5,
+              cursor: input.trim() && !loading ? 'pointer' : 'default',
+              opacity: input.trim() && !loading ? 1 : 0.5,
               margin: '4px 0',
               flexShrink: 0,
             }}
           >
-            Ask
+            {loading ? '...' : 'Ask'}
           </button>
         </div>
       </div>
@@ -129,8 +225,17 @@ export default function CallyAssistant({ events, currentUid, couple, currentUser
               ✕ Close
             </button>
           </div>
+
           {/* Messages */}
-          <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div
+            style={{
+              maxHeight: 260,
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+            }}
+          >
             {messages.map((msg, i) => (
               <div
                 key={i}
@@ -138,7 +243,8 @@ export default function CallyAssistant({ events, currentUid, couple, currentUser
                   alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
                   background: msg.role === 'user' ? CHAT_GREEN : 'var(--color-bg)',
                   border: `1px solid ${msg.role === 'user' ? CALLY_GREEN : 'var(--color-border)'}`,
-                  borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                  borderRadius:
+                    msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                   padding: '8px 14px',
                   fontSize: '0.82rem',
                   lineHeight: 1.6,
@@ -148,11 +254,33 @@ export default function CallyAssistant({ events, currentUid, couple, currentUser
                 }}
               >
                 {msg.role === 'cally' && (
-                  <span style={{ fontWeight: 700, color: CALLY_GREEN, marginRight: 4 }}>Cally:</span>
+                  <span style={{ fontWeight: 700, color: CALLY_GREEN, marginRight: 4 }}>
+                    Cally:
+                  </span>
                 )}
                 {msg.text}
               </div>
             ))}
+
+            {/* Typing indicator */}
+            {loading && (
+              <div
+                style={{
+                  alignSelf: 'flex-start',
+                  background: 'var(--color-bg)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '16px 16px 16px 4px',
+                  padding: '8px 14px',
+                  fontSize: '0.82rem',
+                  color: CALLY_GREEN,
+                  fontStyle: 'italic',
+                }}
+              >
+                <span style={{ fontWeight: 700, marginRight: 4 }}>Cally:</span>
+                thinking… 💭
+              </div>
+            )}
+
             <div ref={bottomRef} />
           </div>
         </div>
@@ -160,3 +288,16 @@ export default function CallyAssistant({ events, currentUid, couple, currentUser
     </div>
   );
 }
+
+interface Props {
+  events: CallyEvent[];
+  currentUid: string;
+  couple: Couple | null;
+  currentUserName: string;
+}
+
+interface Message {
+  role: 'user' | 'cally';
+  text: string;
+}
+

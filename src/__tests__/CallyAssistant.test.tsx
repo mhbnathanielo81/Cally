@@ -4,16 +4,31 @@
  * Component-level tests for the Cally AI assistant chatbot.
  * Verifies that the UI renders correctly, accepts input, shows the chat panel,
  * and displays Cally's replies.
+ *
+ * The askCally function is mocked so tests don't hit the network.
  */
 
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import CallyAssistant from '@/components/CallyAssistant';
 import { CallyEvent, Couple } from '@/types';
+
+// ── Mock askCally so tests don't hit the network ──────────────────────────────
+
+jest.mock('@/lib/callyAI', () => ({
+  askCally: jest.fn().mockResolvedValue({ action: 'reply', reply: 'There is 1 event on the calendar.' }),
+}));
+
+import { askCally } from '@/lib/callyAI';
+const mockAskCally = askCally as jest.MockedFunction<typeof askCally>;
 
 // jsdom doesn't implement scrollIntoView — provide a no-op stub
 beforeAll(() => {
   window.HTMLElement.prototype.scrollIntoView = jest.fn();
+});
+
+afterEach(() => {
+  jest.clearAllMocks();
 });
 
 // ── fixtures ──────────────────────────────────────────────────────────────────
@@ -60,6 +75,7 @@ const baseProps = {
   currentUid: MY_UID,
   couple: fakeCouple,
   currentUserName: 'Alex',
+  onCreateEvent: jest.fn().mockResolvedValue(undefined),
 };
 
 // ── rendering ─────────────────────────────────────────────────────────────────
@@ -131,37 +147,38 @@ describe('CallyAssistant — submitting questions', () => {
     return { input };
   }
 
-  it('displays the user message bubble after clicking Ask', () => {
+  it('displays the user message bubble after clicking Ask', async () => {
     const { input } = setup();
     fireEvent.change(input, { target: { value: 'how many events do we have' } });
     fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
     expect(screen.getByText('how many events do we have')).toBeInTheDocument();
   });
 
-  it('displays Cally reply after submitting', () => {
+  it('displays Cally reply after submitting', async () => {
+    mockAskCally.mockResolvedValueOnce({ action: 'reply', reply: 'There is 1 event on the calendar.' });
     const events = [makeEvent({ title: 'BBQ', month: 6 })];
     const { input } = setup(events);
     fireEvent.change(input, { target: { value: 'how many events do we have' } });
     fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
-    // Cally should say there is 1 event
-    expect(screen.getByText(/1 event/i)).toBeInTheDocument();
+    // Cally should say there is 1 event (from the mock)
+    await waitFor(() => expect(screen.getByText(/1 event/i)).toBeInTheDocument());
   });
 
-  it('clears the input after submitting', () => {
+  it('clears the input after submitting', async () => {
     const { input } = setup();
     fireEvent.change(input, { target: { value: 'some question' } });
     fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
     expect((input as HTMLInputElement).value).toBe('');
   });
 
-  it('submits on Enter key press', () => {
+  it('submits on Enter key press', async () => {
     const { input } = setup();
     fireEvent.change(input, { target: { value: 'how many events do we have' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(screen.getByText('how many events do we have')).toBeInTheDocument();
   });
 
-  it('does not submit when input is empty', () => {
+  it('does not submit when input is empty', async () => {
     setup();
     // There should be exactly 1 message bubble (the greeting)
     const beforeCount = screen.getAllByText(/Cally:/).length;
@@ -174,11 +191,15 @@ describe('CallyAssistant — submitting questions', () => {
 // ── Michigan query integration test ──────────────────────────────────────────
 
 describe('CallyAssistant — Michigan scenario', () => {
-  it('correctly answers "how many times am I going to Michigan this year"', () => {
+  it('sends the question to askCally and displays its reply', async () => {
+    mockAskCally.mockResolvedValueOnce({
+      action: 'reply',
+      reply: 'You have 2 events in Michigan: Detroit Visit (March 10, added by Alex) and Ann Arbor Trip (July 20, added by Jordan).',
+    });
+
     const events = [
       makeEvent({ id: 'e1', title: 'Detroit Visit', location: 'Michigan', time: '9:00 AM', day: 10, month: 3, year: 2026, createdBy: MY_UID }),
       makeEvent({ id: 'e2', title: 'Ann Arbor Trip', location: 'Michigan', time: '2:00 PM', day: 20, month: 7, year: 2026, createdBy: PARTNER_UID }),
-      makeEvent({ id: 'e3', title: 'Unrelated Event', location: 'Chicago', time: '10:00 AM', day: 1, month: 5, year: 2026 }),
     ];
 
     render(<CallyAssistant {...baseProps} events={events} />);
@@ -188,15 +209,10 @@ describe('CallyAssistant — Michigan scenario', () => {
     fireEvent.change(input, { target: { value: 'how many times am I going to Michigan this year' } });
     fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
 
-    // Should mention 2 events for Michigan
-    expect(screen.getByText(/2 events/)).toBeInTheDocument();
-    // Should list both Michigan events
+    await waitFor(() => expect(screen.getByText(/2 events/)).toBeInTheDocument());
     expect(screen.getByText(/Detroit Visit/)).toBeInTheDocument();
     expect(screen.getByText(/Ann Arbor Trip/)).toBeInTheDocument();
-    // Should NOT mention the Chicago event
-    expect(screen.queryByText(/Unrelated Event/)).not.toBeInTheDocument();
-    // Should identify who added each event
-    expect(screen.getByText(/Alex/)).toBeInTheDocument();   // Detroit Visit — Alex
-    expect(screen.getByText(/Jordan/)).toBeInTheDocument(); // Ann Arbor Trip — Jordan
+    expect(screen.getByText(/Alex/)).toBeInTheDocument();
+    expect(screen.getByText(/Jordan/)).toBeInTheDocument();
   });
 });
