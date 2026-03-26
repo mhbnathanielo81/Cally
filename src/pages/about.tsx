@@ -11,7 +11,7 @@ export default function AboutPage() {
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 24px', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
         <Link href="/calendar" style={{ textDecoration: 'none', display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
           <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-primary)' }}>Cally</span>
-          <span style={{ fontSize: '0.95rem', fontStyle: 'italic', color: 'var(--color-primary)' }}>living together</span>
+          <span style={{ fontSize: '1.35rem', fontStyle: 'italic', color: 'var(--color-primary)', fontFamily: "'Great Vibes', cursive", letterSpacing: '0.03em', background: 'linear-gradient(90deg, #1DB954, #a8f5c8, #1DB954)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>living together</span>
         </Link>
         <button
           className="btn-ghost"

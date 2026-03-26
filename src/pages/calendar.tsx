@@ -10,6 +10,7 @@ import AddEventModal from '@/components/AddEventModal';
 import EventDetailModal from '@/components/EventDetailModal';
 import CoupleLinkModal from '@/components/CoupleLinkModal';
 import ProfileMenu from '@/components/ProfileMenu';
+import CallyAssistant from '@/components/CallyAssistant';
 import { CallyEvent } from '@/types';
 import { requestNotificationPermission, setupForegroundMessages } from '@/lib/messaging';
 
@@ -74,7 +75,7 @@ export default function CalendarPage() {
           <div>
             <Link href="/about" style={{ textDecoration: 'none', display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
               <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-primary)' }}>Cally</h1>
-              <p style={{ margin: 0, fontSize: '1rem', fontStyle: 'italic', color: 'var(--color-primary)', lineHeight: 1.2 }}>living together</p>
+              <p style={{ margin: 0, fontSize: '1.35rem', fontStyle: 'italic', color: 'var(--color-primary)', lineHeight: 1.2, fontFamily: "'Great Vibes', cursive", letterSpacing: '0.03em', background: 'linear-gradient(90deg, #1DB954, #a8f5c8, #1DB954)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>living together</p>
             </Link>
           </div>
           <span style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>{monthNames[month - 1]} {year}</span>
@@ -86,6 +87,14 @@ export default function CalendarPage() {
           <ProfileMenu user={user} />
         </div>
       </header>
+
+      {/* Cally AI Assistant */}
+      <CallyAssistant
+        events={events}
+        currentUid={user.uid}
+        couple={couple}
+        currentUserName={profile?.displayName ?? user.displayName ?? 'you'}
+      />
 
       {/* Body */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>

@@ -22,6 +22,17 @@ export default function CalendarGrid({ month, year, events, currentUid, onDayCli
   }, [month, year]);
 
   const eventsByDay = useMemo(() => {
+    function timeToMinutes(time: string): number {
+      const match = time.match(/(\d+):(\d+)\s*(AM|PM)/i);
+      if (!match) return 0;
+      let hours = parseInt(match[1], 10);
+      const minutes = parseInt(match[2], 10);
+      const period = match[3].toUpperCase();
+      if (period === 'PM' && hours !== 12) hours += 12;
+      if (period === 'AM' && hours === 12) hours = 0;
+      return hours * 60 + minutes;
+    }
+
     const map: Record<number, CallyEvent[]> = {};
     events
       .filter((e) => e.month === month && e.year === year)
@@ -29,6 +40,9 @@ export default function CalendarGrid({ month, year, events, currentUid, onDayCli
         if (!map[e.day]) map[e.day] = [];
         map[e.day].push(e);
       });
+    Object.keys(map).forEach((day) => {
+      map[Number(day)].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+    });
     return map;
   }, [events, month, year]);
 
