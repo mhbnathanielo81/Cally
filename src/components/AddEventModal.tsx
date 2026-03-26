@@ -36,7 +36,11 @@ export default function AddEventModal({ coupleId, createdBy, day, month, year, o
     if (!title.trim()) { setError('Title is required.'); return; }
     setSaving(true);
     try {
-      await addEvent(coupleId, createdBy, { title: title.trim(), time, location: location.trim() || undefined, notes: notes.trim() || undefined, day, month, year });
+      // Build payload without undefined values — Firestore rejects undefined fields
+      const payload: Parameters<typeof addEvent>[2] = { title: title.trim(), time, day, month, year };
+      if (location.trim()) payload.location = location.trim();
+      if (notes.trim()) payload.notes = notes.trim();
+      await addEvent(coupleId, createdBy, payload);
       onSaved();
       onClose();
     } catch {
@@ -63,12 +67,12 @@ export default function AddEventModal({ coupleId, createdBy, day, month, year, o
             </select>
           </div>
           <div className="field">
-            <label>Location</label>
-            <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Optional" />
+            <label>Location <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}>(optional)</span></label>
+            <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Add a location" />
           </div>
           <div className="field">
-            <label>Notes</label>
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" rows={3} style={{ resize: 'vertical' }} />
+            <label>Notes <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}>(optional)</span></label>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Add notes" rows={3} style={{ resize: 'vertical' }} />
           </div>
           <div className="modal-actions">
             <button type="button" className="btn-ghost" onClick={onClose}>Cancel</button>

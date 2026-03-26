@@ -70,23 +70,16 @@ export default function CalendarPage() {
       {/* Header */}
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-primary)' }}>Cally</h1>
+          <div>
+            <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-primary)' }}>Cally</h1>
+            <p style={{ margin: 0, fontSize: '1rem', fontStyle: 'italic', color: 'var(--color-primary)', lineHeight: 1.2 }}>living together</p>
+          </div>
           <span style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>{monthNames[month - 1]} {year}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          {couple && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem' }}>
-              <span style={{ color: 'var(--color-muted)' }}>Paired with</span>
-              <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>
-                {couple.user1 === user.uid ? couple.user2DisplayName : couple.user1DisplayName}
-              </span>
-            </div>
-          )}
-          {!couple && !showCoupleModal && (
-            <button className="btn-ghost" onClick={() => setShowCoupleModal(true)} style={{ fontSize: '0.85rem', padding: '6px 12px' }}>
-              🔗 Connect partner
-            </button>
-          )}
+          <button className="btn-ghost" onClick={() => setShowCoupleModal(true)} style={{ fontSize: '0.85rem', padding: '6px 12px' }}>
+            💚 Pair Calendar
+          </button>
           <ProfileMenu user={user} />
         </div>
       </header>
@@ -139,7 +132,7 @@ export default function CalendarPage() {
         />
       )}
       {showCoupleModal && (
-        <CoupleLinkModal user={user} onLinked={handleCoupleLinked} />
+        <CoupleLinkModal user={user} couple={couple} onLinked={handleCoupleLinked} onClose={() => setShowCoupleModal(false)} />
       )}
     </div>
   );
