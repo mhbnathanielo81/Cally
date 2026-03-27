@@ -14,11 +14,27 @@ const firebaseConfig = {
 
 // Firebase is only initialized client-side. During SSR / build the module
 // exports stubs so that Next.js page rendering never throws.
+//
+// Use globalThis to persist emulator-connection flags across Next.js Fast
+// Refresh hot reloads.  Module-level `let` variables are re-initialised on
+// every hot reload, which would cause `connectFirestoreEmulator` /
+// `connectAuthEmulator` to be called a second time on an already-connected
+// instance — throwing "Firestore has already been started" in dev mode.
+declare const globalThis: {
+  _callyApp?: FirebaseApp;
+  _callyAuth?: Auth;
+  _callyDb?: Firestore;
+  _callyAuthEmulatorConnected?: boolean;
+  _callyFirestoreEmulatorConnected?: boolean;
+} & typeof global;
+
 let app: FirebaseApp | null = null;
 let _auth: Auth | null = null;
 let _db: Firestore | null = null;
-let _authEmulatorConnected = false;
-let _firestoreEmulatorConnected = false;
+const isAuthEmulatorConnected = () => !!globalThis._callyAuthEmulatorConnected;
+const setAuthEmulatorConnected = () => { globalThis._callyAuthEmulatorConnected = true; };
+const isFirestoreEmulatorConnected = () => !!globalThis._callyFirestoreEmulatorConnected;
+const setFirestoreEmulatorConnected = () => { globalThis._callyFirestoreEmulatorConnected = true; };
 
 function getFirebaseApp(): FirebaseApp {
   if (!app) {
@@ -30,9 +46,9 @@ function getFirebaseApp(): FirebaseApp {
 export function getAuthInstance(): Auth {
   if (!_auth) {
     _auth = getAuth(getFirebaseApp());
-    if (process.env.NEXT_PUBLIC_USE_EMULATORS === 'true' && !_authEmulatorConnected) {
+    if (process.env.NEXT_PUBLIC_USE_EMULATORS === 'true' && !isAuthEmulatorConnected()) {
       connectAuthEmulator(_auth, 'http://127.0.0.1:9099', { disableWarnings: true });
-      _authEmulatorConnected = true;
+      setAuthEmulatorConnected();
     }
   }
   return _auth;
@@ -41,9 +57,9 @@ export function getAuthInstance(): Auth {
 export function getDbInstance(): Firestore {
   if (!_db) {
     _db = getFirestore(getFirebaseApp());
-    if (process.env.NEXT_PUBLIC_USE_EMULATORS === 'true' && !_firestoreEmulatorConnected) {
+    if (process.env.NEXT_PUBLIC_USE_EMULATORS === 'true' && !isFirestoreEmulatorConnected()) {
       connectFirestoreEmulator(_db, '127.0.0.1', 8080);
-      _firestoreEmulatorConnected = true;
+      setFirestoreEmulatorConnected();
     }
   }
   return _db;

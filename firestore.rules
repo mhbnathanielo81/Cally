@@ -1,8 +1,60 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    // Returns the coupleId stored on the authenticated user's profile, or null.
+    function userCoupleId() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.coupleId;
+    }
+
+    // True when the user is allowed to access events/resources belonging to
+    // the given coupleId.  Two cases are supported:
+    //   1. Coupled users  — their profile's coupleId matches the resource coupleId.
+    //   2. Solo users     — their uid is used as the coupleId (no couple linked yet).
+    function canAccessCouple(cId) {
+      return request.auth != null && (
+        userCoupleId() == cId || request.auth.uid == cId
+      );
+    }
+
+    // ── Users ─────────────────────────────────────────────────────────────────
+
+    match /users/{uid} {
+      // Each user may only read and write their own profile.
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ── Couples ───────────────────────────────────────────────────────────────
+
+    match /couples/{coupleId} {
+      // Any authenticated user may read couple documents.
+      // This is required so that a joining user can look up a couple by invite
+      // code before they are recorded as user2.
+      allow read: if request.auth != null;
+
+      // Only the creator (user1) may create a couple document.
+      allow create: if request.auth != null
+        && request.resource.data.user1 == request.auth.uid;
+
+      // Existing members, or a new user becoming user2, may update.
+      allow update: if request.auth != null && (
+        resource.data.user1 == request.auth.uid
+        || resource.data.user2 == request.auth.uid
+        || request.resource.data.user2 == request.auth.uid
+      );
+    }
+
+    // ── Events ────────────────────────────────────────────────────────────────
+
+    match /events/{eventId} {
+      // Read / update / delete: user must belong to the couple that owns the event.
+      allow read, update, delete: if canAccessCouple(resource.data.coupleId);
+
+      // Create: user must belong to the couple AND must set themselves as createdBy.
+      allow create: if canAccessCouple(request.resource.data.coupleId)
+        && request.resource.data.createdBy == request.auth.uid;
     }
   }
 }

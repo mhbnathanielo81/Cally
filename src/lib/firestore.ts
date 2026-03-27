@@ -149,8 +149,15 @@ export async function deleteEvent(eventId: string): Promise<void> {
 export function subscribeToEvents(coupleId: string, callback: (events: CallyEvent[]) => void) {
   const db = getDbInstance();
   const q = query(collection(db, 'events'), where('coupleId', '==', coupleId));
-  return onSnapshot(q, (snap) => {
-    const events = snap.docs.map((d) => ({ id: d.id, ...d.data() } as CallyEvent));
-    callback(events);
-  });
+  return onSnapshot(
+    q,
+    (snap) => {
+      const events = snap.docs.map((d) => ({ id: d.id, ...d.data() } as CallyEvent));
+      callback(events);
+    },
+    (error) => {
+      console.error('[Cally] subscribeToEvents error:', error);
+      callback([]);
+    },
+  );
 }
