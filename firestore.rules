@@ -75,6 +75,20 @@ service cloud.firestore {
                             && resource.data.createdBy == request.auth.uid;
     }
 
+    // ── Event history (audit log) ──────────────────────────────────────────
+    // Both partners can read history entries for their couple.
+    // Entries are written server-side after mutations; they are immutable once created.
+    match /eventHistory/{historyId} {
+      allow read: if isSignedIn()
+                  && isEventPartner(resource.data.coupleId);
+
+      allow create: if isSignedIn()
+                    && request.resource.data.changedBy == request.auth.uid
+                    && isEventPartner(request.resource.data.coupleId);
+
+      allow update, delete: if false;
+    }
+
     // Default deny on everything else (Firestore built-in behavior).
   }
 }

@@ -12,10 +12,13 @@ import {
   serverTimestamp,
   Timestamp,
   getDocs,
+  orderBy,
+  limit,
 } from 'firebase/firestore';
 import { User } from 'firebase/auth';
-import { getDbInstance } from './firebase';
-import { CallyEvent, Couple, UserProfile, AddEventPayload } from '@/types';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { getDbInstance, getStorageInstance } from './firebase';
+import { CallyEvent, Couple, UserProfile, AddEventPayload, EventHistoryEntry } from '@/types';
 
 /* ---- Users ---- */
 export async function upsertUser(user: User): Promise<void> {
@@ -28,6 +31,7 @@ export async function upsertUser(user: User): Promise<void> {
       email: user.email ?? '',
       displayName: user.displayName ?? '',
       photoURL: user.photoURL ?? '',
+      bio: '',
       coupleId: null,
       fcmToken: null,
       createdAt: serverTimestamp(),
@@ -51,6 +55,18 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 export async function updateFcmToken(uid: string, token: string): Promise<void> {
   const db = getDbInstance();
   await updateDoc(doc(db, 'users', uid), { fcmToken: token, updatedAt: serverTimestamp() });
+}
+
+export async function updateUserProfile(uid: string, updates: { bio?: string; photoURL?: string }): Promise<void> {
+  const db = getDbInstance();
+  await updateDoc(doc(db, 'users', uid), { ...updates, updatedAt: serverTimestamp() });
+}
+
+export async function uploadProfilePhoto(uid: string, file: File): Promise<string> {
+  const storage = getStorageInstance();
+  const photoRef = storageRef(storage, `users/${uid}/profile`);
+  await uploadBytes(photoRef, file);
+  return getDownloadURL(photoRef);
 }
 
 /* ---- Couples ---- */
@@ -123,9 +139,41 @@ export function subscribeToCouple(coupleId: string, callback: (couple: Couple | 
 }
 
 /* ---- Events ---- */
-export async function addEvent(coupleId: string, createdBy: string, payload: AddEventPayload): Promise<string> {
+
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function formatEventDate(day: number, month: number, year: number): string {
+  return `${MONTH_NAMES[month - 1]} ${day}, ${year}`;
+}
+
+interface HistoryContext {
+  changedBy: string;
+  changedByName: string;
+  previousEvent?: CallyEvent;
+}
+
+async function writeEventHistory(
+  db: ReturnType<typeof getDbInstance>,
+  entry: Omit<EventHistoryEntry, 'id' | 'changedAt'>,
+): Promise<void> {
+  try {
+    await addDoc(collection(db, 'eventHistory'), {
+      ...entry,
+      changedAt: serverTimestamp(),
+    });
+  } catch (err) {
+    console.error('[Cally] writeEventHistory error:', err);
+  }
+}
+
+export async function addEvent(
+  coupleId: string,
+  createdBy: string,
+  payload: AddEventPayload,
+  ctx?: Pick<HistoryContext, 'changedByName'>,
+): Promise<string> {
   const db = getDbInstance();
-  const ref = await addDoc(collection(db, 'events'), {
+  const docRef = await addDoc(collection(db, 'events'), {
     coupleId,
     createdBy,
     type: 'event',
@@ -133,17 +181,63 @@ export async function addEvent(coupleId: string, createdBy: string, payload: Add
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
-  return ref.id;
+  await writeEventHistory(db, {
+    coupleId,
+    eventId: docRef.id,
+    eventTitle: payload.title,
+    eventDate: formatEventDate(payload.day, payload.month, payload.year),
+    action: 'created',
+    changedBy: createdBy,
+    changedByName: ctx?.changedByName ?? '',
+  });
+  return docRef.id;
 }
 
-export async function updateEvent(eventId: string, payload: Partial<AddEventPayload>): Promise<void> {
+export async function updateEvent(
+  eventId: string,
+  payload: Partial<AddEventPayload>,
+  ctx?: HistoryContext,
+): Promise<void> {
   const db = getDbInstance();
   await updateDoc(doc(db, 'events', eventId), { ...payload, updatedAt: serverTimestamp() });
+  if (ctx?.changedBy && ctx?.previousEvent) {
+    const prev = ctx.previousEvent;
+    const changes: Record<string, { from: unknown; to: unknown }> = {};
+    (Object.keys(payload) as (keyof AddEventPayload)[]).forEach((key) => {
+      const oldVal = prev[key as keyof CallyEvent];
+      const newVal = payload[key];
+      if (oldVal !== newVal) {
+        changes[key] = { from: oldVal ?? null, to: newVal ?? null };
+      }
+    });
+    await writeEventHistory(db, {
+      coupleId: prev.coupleId,
+      eventId,
+      eventTitle: payload.title ?? prev.title,
+      eventDate: formatEventDate(prev.day, prev.month, prev.year),
+      action: 'updated',
+      changedBy: ctx.changedBy,
+      changedByName: ctx.changedByName,
+      changes,
+    });
+  }
 }
 
-export async function deleteEvent(eventId: string): Promise<void> {
+export async function deleteEvent(eventId: string, ctx?: HistoryContext & { event?: CallyEvent }): Promise<void> {
   const db = getDbInstance();
   await deleteDoc(doc(db, 'events', eventId));
+  if (ctx?.changedBy && ctx?.event) {
+    const ev = ctx.event;
+    await writeEventHistory(db, {
+      coupleId: ev.coupleId,
+      eventId,
+      eventTitle: ev.title,
+      eventDate: formatEventDate(ev.day, ev.month, ev.year),
+      action: 'deleted',
+      changedBy: ctx.changedBy,
+      changedByName: ctx.changedByName,
+    });
+  }
 }
 
 export function subscribeToEvents(coupleId: string, callback: (events: CallyEvent[]) => void) {
@@ -157,6 +251,31 @@ export function subscribeToEvents(coupleId: string, callback: (events: CallyEven
     },
     (error) => {
       console.error('[Cally] subscribeToEvents error:', error);
+      callback([]);
+    },
+  );
+}
+
+/* ---- Event History ---- */
+export function subscribeToEventHistory(
+  coupleId: string,
+  callback: (entries: EventHistoryEntry[]) => void,
+) {
+  const db = getDbInstance();
+  const q = query(
+    collection(db, 'eventHistory'),
+    where('coupleId', '==', coupleId),
+    orderBy('changedAt', 'desc'),
+    limit(100),
+  );
+  return onSnapshot(
+    q,
+    (snap) => {
+      const entries = snap.docs.map((d) => ({ id: d.id, ...d.data() } as EventHistoryEntry));
+      callback(entries);
+    },
+    (error) => {
+      console.error('[Cally] subscribeToEventHistory error:', error);
       callback([]);
     },
   );

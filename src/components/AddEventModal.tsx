@@ -14,6 +14,7 @@ for (let h = 0; h < 24; h++) {
 interface Props {
   coupleId: string;
   createdBy: string;
+  createdByName?: string;
   day: number;
   month: number;
   year: number;
@@ -21,7 +22,7 @@ interface Props {
   onSaved: () => void;
 }
 
-export default function AddEventModal({ coupleId, createdBy, day, month, year, onClose, onSaved }: Props) {
+export default function AddEventModal({ coupleId, createdBy, createdByName, day, month, year, onClose, onSaved }: Props) {
   const [title, setTitle] = useState('');
   const [time, setTime] = useState('12:00 PM');
   const [location, setLocation] = useState('');
@@ -40,7 +41,7 @@ export default function AddEventModal({ coupleId, createdBy, day, month, year, o
       const payload: Parameters<typeof addEvent>[2] = { title: title.trim(), time, day, month, year };
       if (location.trim()) payload.location = location.trim();
       if (notes.trim()) payload.notes = notes.trim();
-      await addEvent(coupleId, createdBy, payload);
+      await addEvent(coupleId, createdBy, payload, { changedByName: createdByName ?? '' });
       onSaved();
       onClose();
     } catch {

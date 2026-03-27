@@ -18,10 +18,11 @@ const MONTH_NAMES = ['January','February','March','April','May','June','July','A
 interface Props {
   event: CallyEvent;
   currentUid: string;
+  currentUserName?: string;
   onClose: () => void;
 }
 
-export default function EventDetailModal({ event, currentUid, onClose }: Props) {
+export default function EventDetailModal({ event, currentUid, currentUserName = '', onClose }: Props) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(event.title);
   const [time, setTime] = useState(event.time);
@@ -38,7 +39,11 @@ export default function EventDetailModal({ event, currentUid, onClose }: Props) 
     if (!title.trim()) { setError('Title is required.'); return; }
     setSaving(true);
     try {
-      await updateEvent(event.id, { title: title.trim(), time, location: location.trim() || undefined, notes: notes.trim() || undefined });
+      await updateEvent(event.id, { title: title.trim(), time, location: location.trim() || undefined, notes: notes.trim() || undefined }, {
+        changedBy: currentUid,
+        changedByName: currentUserName,
+        previousEvent: event,
+      });
       setEditing(false);
     } catch {
       setError('Failed to update event.');
@@ -49,7 +54,7 @@ export default function EventDetailModal({ event, currentUid, onClose }: Props) 
   const handleDelete = async () => {
     if (!confirm('Delete this event?')) return;
     try {
-      await deleteEvent(event.id);
+      await deleteEvent(event.id, { event, changedBy: currentUid, changedByName: currentUserName });
       onClose();
     } catch {
       setError('Failed to delete event.');

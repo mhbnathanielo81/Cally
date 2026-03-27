@@ -5,6 +5,7 @@ export interface UserProfile {
   email: string;
   displayName: string;
   photoURL: string;
+  bio?: string;
   coupleId: string | null;
   fcmToken: string | null;
   createdAt: Timestamp;
@@ -50,4 +51,17 @@ export interface AddEventPayload {
   day: number;
   month: number;
   year: number;
+}
+
+export interface EventHistoryEntry {
+  id: string;
+  coupleId: string;
+  eventId: string;
+  eventTitle: string;
+  eventDate: string;
+  action: 'created' | 'updated' | 'deleted';
+  changedBy: string;
+  changedByName: string;
+  changedAt: Timestamp;
+  changes?: Record<string, { from: unknown; to: unknown }>;
 }

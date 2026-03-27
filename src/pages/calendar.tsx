@@ -9,6 +9,7 @@ import CalendarGrid from '@/components/CalendarGrid';
 import MonthSidebar from '@/components/MonthSidebar';
 import AddEventModal from '@/components/AddEventModal';
 import EventDetailModal from '@/components/EventDetailModal';
+import EventHistoryModal from '@/components/EventHistoryModal';
 import DayDetailModal from '@/components/DayDetailModal';
 import CoupleLinkModal from '@/components/CoupleLinkModal';
 import ProfileMenu from '@/components/ProfileMenu';
@@ -28,10 +29,13 @@ export default function CalendarPage() {
   const [addEventDay, setAddEventDay] = useState<number | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<CallyEvent | null>(null);
   const [showCoupleModal, setShowCoupleModal] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   const coupleId = profile?.coupleId ?? null;
   const { events } = useEvents(coupleId || user?.uid || null);
   const { couple } = useCouple(coupleId);
+
+  const currentUserName = profile?.displayName ?? user?.displayName ?? '';
 
   // Redirect unauthenticated users
   useEffect(() => {
@@ -100,24 +104,25 @@ export default function CalendarPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      {/* Header */}
-      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
+      {/* Header — three-column layout so "living together" sits centred at the very top */}
+      <header style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr auto 1fr',
+        alignItems: 'center',
+        padding: '8px 20px',
+        borderBottom: '1px solid var(--color-border)',
+        background: 'var(--color-surface)',
+        gap: 8,
+      }}>
+        {/* Left: Cally + month */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Link href="/about" style={{ textDecoration: 'none' }}>
             <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-primary)' }}>Cally</h1>
           </Link>
           <span style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>{monthNames[month - 1]} {year}</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <button className="btn-ghost" onClick={() => setShowCoupleModal(true)} style={{ fontSize: '0.85rem', padding: '6px 12px' }}>
-            💚 Pair Calendar
-          </button>
-          <ProfileMenu user={user} />
-        </div>
-      </header>
 
-      {/* "living together" — centered above Cally chat box */}
-      <div style={{ textAlign: 'center', padding: '6px 0 2px', background: 'var(--color-surface)' }}>
+        {/* Centre: living together */}
         <span style={{
           fontSize: '1.8rem',
           fontStyle: 'italic',
@@ -127,17 +132,34 @@ export default function CalendarPage() {
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
           WebkitTextStroke: '0.5px rgba(192,192,192,0.7)',
+          whiteSpace: 'nowrap',
         }}>
           living together
         </span>
-      </div>
+
+        {/* Right: History + Pair Calendar + ProfileMenu */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'flex-end' }}>
+          <button
+            className="btn-ghost"
+            onClick={() => setShowHistory(true)}
+            style={{ fontSize: '0.85rem', padding: '6px 12px' }}
+            title="View calendar history"
+          >
+            📋 History
+          </button>
+          <button className="btn-ghost" onClick={() => setShowCoupleModal(true)} style={{ fontSize: '0.85rem', padding: '6px 12px' }}>
+            💚 Pair Calendar
+          </button>
+          <ProfileMenu user={user} />
+        </div>
+      </header>
 
       {/* Cally AI Assistant */}
       <CallyAssistant
         events={events}
         currentUid={user.uid}
         couple={couple}
-        currentUserName={profile?.displayName ?? user.displayName ?? 'you'}
+        currentUserName={currentUserName || 'you'}
         onCreateEvent={handleCallyCreateEvent}
       />
 
@@ -184,6 +206,7 @@ export default function CalendarPage() {
         <AddEventModal
           coupleId={coupleId ?? user.uid}
           createdBy={user.uid}
+          createdByName={currentUserName}
           day={addEventDay}
           month={month}
           year={year}
@@ -195,11 +218,18 @@ export default function CalendarPage() {
         <EventDetailModal
           event={selectedEvent}
           currentUid={user.uid}
+          currentUserName={currentUserName}
           onClose={() => setSelectedEvent(null)}
         />
       )}
       {showCoupleModal && (
         <CoupleLinkModal user={user} couple={couple} onLinked={handleCoupleLinked} onClose={() => setShowCoupleModal(false)} />
+      )}
+      {showHistory && (
+        <EventHistoryModal
+          coupleId={coupleId ?? user.uid}
+          onClose={() => setShowHistory(false)}
+        />
       )}
     </div>
   );

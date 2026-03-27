@@ -37,7 +37,26 @@ export default function ProfileMenu({ user }: Props) {
       </button>
       {open && (
         <div style={{ position: 'absolute', right: 0, top: 44, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-card)', padding: '8px', minWidth: 180, zIndex: 50 }}>
-          <p style={{ margin: '8px 12px', fontSize: '0.85rem', color: 'var(--color-muted)', borderBottom: '1px solid var(--color-border)', paddingBottom: 8 }}>{user.displayName ?? user.email}</p>
+          <button
+            onClick={() => { setOpen(false); router.push('/profile'); }}
+            style={{
+              display: 'block',
+              width: '100%',
+              textAlign: 'left',
+              background: 'none',
+              padding: '8px 12px',
+              fontSize: '0.85rem',
+              color: 'var(--color-muted)',
+              borderBottom: '1px solid var(--color-border)',
+              marginBottom: 4,
+              borderRadius: 0,
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--color-text)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--color-muted)'; }}
+            aria-label="View profile"
+          >
+            {user.displayName ?? user.email}
+          </button>
           <button onClick={() => { setOpen(false); router.push('/settings'); }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', padding: '8px 12px', borderRadius: 6, color: 'var(--color-text)', fontSize: '0.9rem' }}>
             Settings
           </button>

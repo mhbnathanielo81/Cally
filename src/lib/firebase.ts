@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { Auth, getAuth, connectAuthEmulator } from 'firebase/auth';
 import { Firestore, getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { FirebaseStorage, getStorage } from 'firebase/storage';
 import { getMessaging, isSupported } from 'firebase/messaging';
 
 const firebaseConfig = {
@@ -24,6 +25,7 @@ declare const globalThis: {
   _callyApp?: FirebaseApp;
   _callyAuth?: Auth;
   _callyDb?: Firestore;
+  _callyStorage?: FirebaseStorage;
   _callyAuthEmulatorConnected?: boolean;
   _callyFirestoreEmulatorConnected?: boolean;
 } & typeof global;
@@ -31,6 +33,7 @@ declare const globalThis: {
 let app: FirebaseApp | null = null;
 let _auth: Auth | null = null;
 let _db: Firestore | null = null;
+let _storage: FirebaseStorage | null = null;
 const isAuthEmulatorConnected = () => !!globalThis._callyAuthEmulatorConnected;
 const setAuthEmulatorConnected = () => { globalThis._callyAuthEmulatorConnected = true; };
 const isFirestoreEmulatorConnected = () => !!globalThis._callyFirestoreEmulatorConnected;
@@ -63,6 +66,13 @@ export function getDbInstance(): Firestore {
     }
   }
   return _db;
+}
+
+export function getStorageInstance(): FirebaseStorage {
+  if (!_storage) {
+    _storage = getStorage(getFirebaseApp());
+  }
+  return _storage;
 }
 
 // Convenience re-exports that are safe for SSR — they lazily initialize.
