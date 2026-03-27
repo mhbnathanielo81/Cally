@@ -1,60 +1,80 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
-
-    // Returns the coupleId stored on the authenticated user's profile, or null.
-    function userCoupleId() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.coupleId;
+    // ── Helper: is the request from a signed-in user? ──────────────────────
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    // True when the user is allowed to access events/resources belonging to
-    // the given coupleId.  Two cases are supported:
-    //   1. Coupled users  — their profile's coupleId matches the resource coupleId.
-    //   2. Solo users     — their uid is used as the coupleId (no couple linked yet).
-    function canAccessCouple(cId) {
-      return request.auth != null && (
-        userCoupleId() == cId || request.auth.uid == cId
-      );
+    // ── Helper: does this user belong to the couple? ───────────────────────
+    function isCouplePartner(coupleDoc) {
+      return request.auth.uid == coupleDoc.data.user1
+          || request.auth.uid == coupleDoc.data.user2;
     }
 
-    // ── Users ─────────────────────────────────────────────────────────────────
-
-    match /users/{uid} {
-      // Each user may only read and write their own profile.
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+    // ── Helper: is this user a partner of the couple that owns an event? ──
+    function isEventPartner(coupleId) {
+      return exists(/databases/$(database)/documents/couples/$(coupleId))
+          && isCouplePartner(get(/databases/$(database)/documents/couples/$(coupleId)));
     }
 
-    // ── Couples ───────────────────────────────────────────────────────────────
-
+    // ── Couples ────────────────────────────────────────────────────────────
+    // Any signed-in user can read couple documents.
+    // This is intentional: the invite-code join flow (joinCouple in
+    // firestore.ts) queries the couples collection by inviteCode BEFORE the
+    // joining user is recorded as user2.  Restricting reads to existing
+    // partners would make that query silently return no results and break
+    // the pairing flow.
     match /couples/{coupleId} {
-      // Any authenticated user may read couple documents.
-      // This is required so that a joining user can look up a couple by invite
-      // code before they are recorded as user2.
-      allow read: if request.auth != null;
+      allow read: if isSignedIn();
 
-      // Only the creator (user1) may create a couple document.
-      allow create: if request.auth != null
-        && request.resource.data.user1 == request.auth.uid;
+      allow create: if isSignedIn()
+                    && (request.resource.data.user1 == request.auth.uid
+                        || request.resource.data.user2 == request.auth.uid);
 
-      // Existing members, or a new user becoming user2, may update.
-      allow update: if request.auth != null && (
-        resource.data.user1 == request.auth.uid
-        || resource.data.user2 == request.auth.uid
-        || request.resource.data.user2 == request.auth.uid
-      );
+      allow update: if isSignedIn()
+                    && isCouplePartner(resource);
+
+      allow delete: if isSignedIn()
+                    && isCouplePartner(resource);
     }
 
-    // ── Events ────────────────────────────────────────────────────────────────
-
+    // ── Events ─────────────────────────────────────────────────────────────
+    // Both partners of a couple can CRUD events that belong to their couple.
     match /events/{eventId} {
-      // Read / update / delete: user must belong to the couple that owns the event.
-      allow read, update, delete: if canAccessCouple(resource.data.coupleId);
+      allow read: if isSignedIn()
+                  && isEventPartner(resource.data.coupleId);
 
-      // Create: user must belong to the couple AND must set themselves as createdBy.
-      allow create: if canAccessCouple(request.resource.data.coupleId)
-        && request.resource.data.createdBy == request.auth.uid;
+      allow create: if isSignedIn()
+                    && request.resource.data.createdBy == request.auth.uid
+                    && isEventPartner(request.resource.data.coupleId);
+
+      allow update: if isSignedIn()
+                    && isEventPartner(resource.data.coupleId);
+
+      allow delete: if isSignedIn()
+                    && isEventPartner(resource.data.coupleId);
     }
+
+    // ── User profiles ──────────────────────────────────────────────────────
+    // Each user can read/write only their own profile document.
+    match /users/{userId} {
+      allow read, write: if isSignedIn()
+                         && request.auth.uid == userId;
+    }
+
+    // ── Invites / pairing codes ────────────────────────────────────────────
+    // Anyone signed in can read an invite (to look up a partner code).
+    // Only the creator can write it.
+    match /invites/{inviteId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn()
+                            && resource.data.createdBy == request.auth.uid;
+    }
+
+    // Default deny on everything else (Firestore built-in behavior).
   }
 }

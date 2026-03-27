@@ -6,7 +6,8 @@ functions/node_modules/
 .next/
 out/
 
-# env files
+# env files — ONLY .env.local.example should be committed
+.env
 .env.local
 .env*.local
 
@@ -21,6 +22,8 @@ yarn-error.log*
 .firebase/
 firebase-debug.log
 firestore-debug.log
+pubsub-debug.log
+ui-debug.log
 
 # TypeScript
 *.tsbuildinfo
@@ -31,3 +34,7 @@ public/sw.js
 public/workbox-*.js
 public/worker-*.js
 public/fallback-*.js
+
+# IDE
+.vscode/
+.idea/
