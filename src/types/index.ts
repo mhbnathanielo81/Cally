@@ -51,6 +51,7 @@ export interface AddEventPayload {
   day: number;
   month: number;
   year: number;
+  type?: 'event' | 'dinner';
 }
 
 export interface EventHistoryEntry {

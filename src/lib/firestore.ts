@@ -15,9 +15,9 @@ import {
   orderBy,
   limit,
 } from 'firebase/firestore';
-import { User } from 'firebase/auth';
+import { User, updateProfile } from 'firebase/auth';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { getDbInstance, getStorageInstance } from './firebase';
+import { getAuthInstance, getDbInstance, getStorageInstance } from './firebase';
 import { CallyEvent, Couple, UserProfile, AddEventPayload, EventHistoryEntry } from '@/types';
 
 /* ---- Users ---- */
@@ -38,11 +38,17 @@ export async function upsertUser(user: User): Promise<void> {
       updatedAt: serverTimestamp(),
     });
   } else {
-    await updateDoc(ref, {
+    // Preserve a custom photoURL the user may have uploaded via the profile page.
+    // Only fall back to the OAuth photo if no photoURL is stored yet.
+    const existing = snap.data() as UserProfile;
+    const updates: Record<string, unknown> = {
       displayName: user.displayName ?? '',
-      photoURL: user.photoURL ?? '',
       updatedAt: serverTimestamp(),
-    });
+    };
+    if (!existing.photoURL) {
+      updates.photoURL = user.photoURL ?? '';
+    }
+    await updateDoc(ref, updates);
   }
 }
 
@@ -66,7 +72,13 @@ export async function uploadProfilePhoto(uid: string, file: File): Promise<strin
   const storage = getStorageInstance();
   const photoRef = storageRef(storage, `users/${uid}/profile`);
   await uploadBytes(photoRef, file);
-  return getDownloadURL(photoRef);
+  const downloadURL = await getDownloadURL(photoRef);
+  // Also update the Firebase Auth profile so user.photoURL is current everywhere
+  const auth = getAuthInstance();
+  if (auth.currentUser && auth.currentUser.uid === uid) {
+    await updateProfile(auth.currentUser, { photoURL: downloadURL });
+  }
+  return downloadURL;
 }
 
 /* ---- Couples ---- */
@@ -173,11 +185,12 @@ export async function addEvent(
   ctx?: Pick<HistoryContext, 'changedByName'>,
 ): Promise<string> {
   const db = getDbInstance();
+  const { type = 'event', ...rest } = payload;
   const docRef = await addDoc(collection(db, 'events'), {
     coupleId,
     createdBy,
-    type: 'event',
-    ...payload,
+    type,
+    ...rest,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -203,7 +216,7 @@ export async function updateEvent(
   if (ctx?.changedBy && ctx?.previousEvent) {
     const prev = ctx.previousEvent;
     const changes: Record<string, { from: unknown; to: unknown }> = {};
-    (Object.keys(payload) as (keyof AddEventPayload)[]).forEach((key) => {
+    (Object.keys(payload) as Array<keyof typeof payload>).forEach((key) => {
       const oldVal = prev[key as keyof CallyEvent];
       const newVal = payload[key];
       if (oldVal !== newVal) {

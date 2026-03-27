@@ -160,7 +160,12 @@ export default function CalendarGrid({ month, year, events, currentUid, onDayCli
                   </button>
                 ))}
                 {dayEvents.length > 3 && (
-                  <span style={{ fontSize: '0.65rem', color: 'var(--color-muted)', paddingLeft: 4 }}>+{dayEvents.length - 3} more</span>
+                  <span
+                    onClick={(e) => { e.stopPropagation(); onDayClick(day); }}
+                    style={{ fontSize: '0.65rem', color: 'var(--color-muted)', paddingLeft: 4, cursor: 'pointer' }}
+                  >
+                    +{dayEvents.length - 3} more
+                  </span>
                 )}
               </div>
             </div>

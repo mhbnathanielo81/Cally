@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { useAuth } from '@/hooks/useAuth';
 import { useEvents } from '@/hooks/useEvents';
 import { useCouple } from '@/hooks/useCouple';
@@ -15,8 +14,8 @@ import CoupleLinkModal from '@/components/CoupleLinkModal';
 import ProfileMenu from '@/components/ProfileMenu';
 import CallyAssistant from '@/components/CallyAssistant';
 import { CallyEvent } from '@/types';
+import { addEvent } from '@/lib/firestore';
 import { requestNotificationPermission, setupForegroundMessages } from '@/lib/messaging';
-import { getDbInstance } from '@/lib/firebase';
 
 export default function CalendarPage() {
   const { user, profile, loading: authLoading, refreshProfile } = useAuth();
@@ -89,22 +88,18 @@ export default function CalendarPage() {
     notes: string;
     type: 'event' | 'dinner';
   }) {
-    const db = getDbInstance();
-    if (!db || !user) {
-      throw new Error('Not connected');
-    }
-    await addDoc(collection(db, 'events'), {
-      ...eventData,
-      coupleId: coupleId || user.uid,
-      createdBy: user.uid,
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    });
+    if (!user) throw new Error('Not connected');
+    await addEvent(
+      coupleId || user.uid,
+      user.uid,
+      eventData,
+      { changedByName: currentUserName },
+    );
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      {/* Header — three-column layout so "living together" sits centred at the very top */}
+      {/* Header — three-column layout so "living together" sits centered at the very top */}
       <header style={{
         display: 'grid',
         gridTemplateColumns: '1fr auto 1fr',

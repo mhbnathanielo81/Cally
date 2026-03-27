@@ -33,6 +33,8 @@ export default function EventDetailModal({ event, currentUid, currentUserName = 
 
   const color = getEventColor(event.createdBy, currentUid, event.type);
   const canEdit = event.createdBy === currentUid;
+  // Both the creator and their partner can delete an event from the shared calendar
+  const canDelete = true;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,11 +46,12 @@ export default function EventDetailModal({ event, currentUid, currentUserName = 
         changedByName: currentUserName,
         previousEvent: event,
       });
-      setEditing(false);
+      // Close the modal so the refreshed event data is shown from the events list
+      onClose();
     } catch {
       setError('Failed to update event.');
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const handleDelete = async () => {
@@ -73,8 +76,8 @@ export default function EventDetailModal({ event, currentUid, currentUserName = 
             {event.location && <p style={{ margin: '0 0 8px', fontSize: '0.9rem' }}>📍 {event.location}</p>}
             {event.notes && <p style={{ margin: '0 0 8px', fontSize: '0.9rem', color: 'var(--color-muted)' }}>{event.notes}</p>}
             <div className="modal-actions" style={{ paddingLeft: 0 }}>
-              {canEdit && <button className="btn-danger" onClick={handleDelete}>Delete</button>}
-              {canEdit && <button className="btn-ghost" onClick={() => setEditing(true)}>Edit</button>}
+              {canDelete && <button className="btn-danger" onClick={handleDelete}>Delete</button>}
+              {canEdit && <button className="btn-ghost" onClick={() => { setError(''); setEditing(true); }}>Edit</button>}
               <button className="btn-primary" onClick={onClose}>Close</button>
             </div>
           </div>
