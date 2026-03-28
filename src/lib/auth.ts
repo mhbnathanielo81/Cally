@@ -16,13 +16,15 @@ const isLocalhost = typeof window !== 'undefined' && window.location.hostname ==
 
 export async function signInWithGoogle(): Promise<void> {
   const auth = getAuthInstance();
+  console.log('[Cally Auth] signInWithGoogle called, isLocalhost:', isLocalhost);
+  console.log('[Cally Auth] auth config:', auth.config);
 
   if (isLocalhost) {
-    // Popup works fine on localhost
     try {
       const result = await signInWithPopup(auth, provider);
       await upsertUser(result.user);
     } catch (err: unknown) {
+      console.error('[Cally Auth] popup error:', err);
       const error = err as { code?: string };
       if (
         error.code === 'auth/popup-blocked' ||
@@ -35,20 +37,29 @@ export async function signInWithGoogle(): Promise<void> {
       }
     }
   } else {
-    // Redirect works reliably on deployed sites
-    await signInWithRedirect(auth, provider);
+    console.log('[Cally Auth] using signInWithRedirect...');
+    try {
+      await signInWithRedirect(auth, provider);
+      console.log('[Cally Auth] redirect initiated');
+    } catch (err) {
+      console.error('[Cally Auth] redirect error:', err);
+      throw err;
+    }
   }
 }
 
 export async function handleRedirectResult(): Promise<void> {
   const auth = getAuthInstance();
+  console.log('[Cally Auth] checking redirect result...');
   try {
     const result = await getRedirectResult(auth);
+    console.log('[Cally Auth] redirect result:', result);
     if (result?.user) {
       await upsertUser(result.user);
+      console.log('[Cally Auth] user upserted after redirect');
     }
   } catch (err) {
-    console.error('[Cally] redirect sign-in error:', err);
+    console.error('[Cally Auth] redirect result error:', err);
   }
 }
 
