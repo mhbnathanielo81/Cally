@@ -16,33 +16,19 @@ const isLocalhost = typeof window !== 'undefined' && window.location.hostname ==
 
 export async function signInWithGoogle(): Promise<void> {
   const auth = getAuthInstance();
-  console.log('[Cally Auth] signInWithGoogle called, isLocalhost:', isLocalhost);
-  console.log('[Cally Auth] auth config:', auth.config);
-
-  if (isLocalhost) {
-    try {
-      const result = await signInWithPopup(auth, provider);
-      await upsertUser(result.user);
-    } catch (err: unknown) {
-      console.error('[Cally Auth] popup error:', err);
-      const error = err as { code?: string };
-      if (
-        error.code === 'auth/popup-blocked' ||
-        error.code === 'auth/popup-closed-by-user' ||
-        error.code === 'auth/cancelled-popup-request'
-      ) {
-        await signInWithRedirect(auth, provider);
-      } else {
-        throw err;
-      }
-    }
-  } else {
-    console.log('[Cally Auth] using signInWithRedirect...');
-    try {
+  try {
+    const result = await signInWithPopup(auth, provider);
+    await upsertUser(result.user);
+  } catch (err: unknown) {
+    console.error('[Cally Auth] popup error:', err);
+    const error = err as { code?: string };
+    if (
+      error.code === 'auth/popup-blocked' ||
+      error.code === 'auth/popup-closed-by-user' ||
+      error.code === 'auth/cancelled-popup-request'
+    ) {
       await signInWithRedirect(auth, provider);
-      console.log('[Cally Auth] redirect initiated');
-    } catch (err) {
-      console.error('[Cally Auth] redirect error:', err);
+    } else {
       throw err;
     }
   }
