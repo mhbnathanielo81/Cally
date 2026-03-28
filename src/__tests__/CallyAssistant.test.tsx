@@ -168,7 +168,7 @@ describe('CallyAssistant — submitting questions', () => {
     const { input } = setup();
     fireEvent.change(input, { target: { value: 'some question' } });
     fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
-    expect((input as HTMLInputElement).value).toBe('');
+    expect((input as HTMLTextAreaElement).value).toBe('');
   });
 
   it('submits on Enter key press', async () => {
@@ -176,6 +176,14 @@ describe('CallyAssistant — submitting questions', () => {
     fireEvent.change(input, { target: { value: 'how many events do we have' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(screen.getByText('how many events do we have')).toBeInTheDocument();
+  });
+
+  it('does NOT submit on Shift+Enter (allows newline)', async () => {
+    const { input } = setup();
+    fireEvent.change(input, { target: { value: 'line one' } });
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: true });
+    // askCally should NOT have been called — the message was not submitted
+    expect(mockAskCally).not.toHaveBeenCalled();
   });
 
   it('does not submit when input is empty', async () => {

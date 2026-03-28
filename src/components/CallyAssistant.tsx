@@ -35,6 +35,10 @@ export default function CallyAssistant({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  /** Maximum textarea height in pixels before a scrollbar appears. */
+  const MAX_TEXTAREA_HEIGHT = 120;
 
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -47,6 +51,9 @@ export default function CallyAssistant({
     const userMsg: ChatMessage = { role: 'user', text: q };
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
     setLoading(true);
 
     try {
@@ -89,8 +96,17 @@ export default function CallyAssistant({
     setLoading(false);
   }
 
-  function onKey(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter') submit();
+  function autoResize(e: React.FormEvent<HTMLTextAreaElement>) {
+    const el = e.currentTarget;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT) + 'px';
+  }
+
+  function onKey(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      submit();
+    }
   }
 
   const CALLY_GREEN = '#1DB954';
@@ -112,7 +128,7 @@ export default function CallyAssistant({
       <div
         style={{
           display: 'flex',
-          alignItems: 'center',
+          alignItems: 'flex-end',
           gap: 10,
           padding: '8px 16px',
           width: '100%',
@@ -161,13 +177,16 @@ export default function CallyAssistant({
             padding: '0 4px 0 14px',
           }}
         >
-          <input
+          <textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onKey}
+            onInput={autoResize}
             onFocus={() => setOpen(true)}
             placeholder="Ask Cally about your calendar…"
             disabled={loading}
+            rows={1}
             style={{
               flex: 1,
               background: 'transparent',
@@ -177,6 +196,9 @@ export default function CallyAssistant({
               fontSize: '0.88rem',
               padding: '7px 0',
               opacity: loading ? 0.5 : 1,
+              resize: 'none',
+              overflow: 'hidden',
+              lineHeight: 1.5,
             }}
           />
           <button
