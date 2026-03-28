@@ -14,7 +14,7 @@ import CoupleLinkModal from '@/components/CoupleLinkModal';
 import ProfileMenu from '@/components/ProfileMenu';
 import CallyAssistant from '@/components/CallyAssistant';
 import { CallyEvent } from '@/types';
-import { addEvent } from '@/lib/firestore';
+import { addEvent, updateEvent, deleteEvent } from '@/lib/firestore';
 import { requestNotificationPermission, setupForegroundMessages } from '@/lib/messaging';
 
 export default function CalendarPage() {
@@ -97,6 +97,27 @@ export default function CalendarPage() {
     );
   }
 
+  async function handleCallyUpdateEvent(eventId: string, changes: Partial<{
+    title: string; day: number; month: number; year: number;
+    time: string; location: string; notes: string; type: 'event' | 'dinner';
+  }>) {
+    const existingEvent = events.find(e => e.id === eventId);
+    await updateEvent(eventId, changes, {
+      changedBy: user!.uid,
+      changedByName: currentUserName,
+      previousEvent: existingEvent,
+    });
+  }
+
+  async function handleCallyDeleteEvent(eventId: string) {
+    const existingEvent = events.find(e => e.id === eventId);
+    await deleteEvent(eventId, {
+      changedBy: user!.uid,
+      changedByName: currentUserName,
+      event: existingEvent,
+    });
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       {/* Header — three-column layout so "living together" sits centered at the very top */}
@@ -156,6 +177,8 @@ export default function CalendarPage() {
         couple={couple}
         currentUserName={currentUserName || 'you'}
         onCreateEvent={handleCallyCreateEvent}
+        onUpdateEvent={handleCallyUpdateEvent}
+        onDeleteEvent={handleCallyDeleteEvent}
       />
 
       {/* Body */}

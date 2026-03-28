@@ -19,6 +19,8 @@ interface Props {
   couple: Couple | null;
   currentUserName: string;
   onCreateEvent: (event: NewEventData) => Promise<void>;
+  onUpdateEvent: (eventId: string, changes: Partial<NewEventData>) => Promise<void>;
+  onDeleteEvent: (eventId: string) => Promise<void>;
 }
 
 export default function CallyAssistant({
@@ -27,6 +29,8 @@ export default function CallyAssistant({
   couple,
   currentUserName,
   onCreateEvent,
+  onUpdateEvent,
+  onDeleteEvent,
 }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: 'cally', text: "Hi! I'm Cally 💚 Ask me anything about your calendar, or tell me to add an event!" },
@@ -81,6 +85,44 @@ export default function CallyAssistant({
           };
           setMessages((prev) => [...prev, errorMsg]);
         }
+      } else if (response.action === 'create_events' && response.events) {
+        try {
+          for (const event of response.events) {
+            await onCreateEvent(event);
+          }
+          const callyMsg: ChatMessage = { role: 'cally', text: response.reply };
+          setMessages((prev) => [...prev, callyMsg]);
+        } catch {
+          const errorMsg: ChatMessage = {
+            role: 'cally',
+            text: "I created some events but hit a problem. Check your calendar and try again for any missing ones! 💚",
+          };
+          setMessages((prev) => [...prev, errorMsg]);
+        }
+      } else if (response.action === 'update_event' && response.update) {
+        const matchedEvent = findEventByTitle(response.update.eventTitle);
+        if (matchedEvent?.id) {
+          try {
+            await onUpdateEvent(matchedEvent.id, response.update.changes);
+            setMessages((prev) => [...prev, { role: 'cally', text: response.reply }]);
+          } catch {
+            setMessages((prev) => [...prev, { role: 'cally', text: "Something went wrong updating that event. Try again! 💚" }]);
+          }
+        } else {
+          setMessages((prev) => [...prev, { role: 'cally', text: `I couldn't find "${response.update!.eventTitle}" on your calendar. Double-check the name? 💚` }]);
+        }
+      } else if (response.action === 'delete_event' && response.deleteEventTitle) {
+        const matchedEvent = findEventByTitle(response.deleteEventTitle);
+        if (matchedEvent?.id) {
+          try {
+            await onDeleteEvent(matchedEvent.id);
+            setMessages((prev) => [...prev, { role: 'cally', text: response.reply }]);
+          } catch {
+            setMessages((prev) => [...prev, { role: 'cally', text: "Something went wrong deleting that event. Try again! 💚" }]);
+          }
+        } else {
+          setMessages((prev) => [...prev, { role: 'cally', text: `I couldn't find "${response.deleteEventTitle}" on your calendar. Double-check the name? 💚` }]);
+        }
       } else {
         const callyMsg: ChatMessage = { role: 'cally', text: response.reply };
         setMessages((prev) => [...prev, callyMsg]);
@@ -94,6 +136,10 @@ export default function CallyAssistant({
     }
 
     setLoading(false);
+  }
+
+  function findEventByTitle(title: string): CallyEvent | undefined {
+    return events.find(e => e.title.toLowerCase() === title.toLowerCase());
   }
 
   function autoResize(e: React.FormEvent<HTMLTextAreaElement>) {

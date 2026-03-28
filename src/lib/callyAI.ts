@@ -8,7 +8,7 @@ export interface ChatMessage {
 }
 
 export interface CallyResponse {
-  action: 'reply' | 'create_event';
+  action: 'reply' | 'create_event' | 'create_events' | 'update_event' | 'delete_event';
   reply: string;
   event?: {
     title: string;
@@ -20,6 +20,24 @@ export interface CallyResponse {
     notes: string;
     type: 'event' | 'dinner';
   };
+  events?: Array<{
+    title: string;
+    day: number;
+    month: number;
+    year: number;
+    time: string;
+    location: string;
+    notes: string;
+    type: 'event' | 'dinner';
+  }>;
+  update?: {
+    eventTitle: string;
+    changes: Partial<{
+      title: string; day: number; month: number; year: number;
+      time: string; location: string; notes: string; type: 'event' | 'dinner';
+    }>;
+  };
+  deleteEventTitle?: string;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -140,6 +158,30 @@ export async function askCally(
         action: 'create_event',
         reply: data.reply || 'Event created! 💚',
         event: data.event,
+      };
+    }
+
+    if (data.action === 'create_events' && Array.isArray(data.events)) {
+      return {
+        action: 'create_events',
+        reply: data.reply || 'Events created! 💚',
+        events: data.events,
+      };
+    }
+
+    if (data.action === 'update_event' && data.eventTitle) {
+      return {
+        action: 'update_event',
+        reply: data.reply || 'Event updated! 💚',
+        update: { eventTitle: data.eventTitle, changes: data.changes || {} },
+      };
+    }
+
+    if (data.action === 'delete_event' && data.eventTitle) {
+      return {
+        action: 'delete_event',
+        reply: data.reply || 'Event deleted! 💚',
+        deleteEventTitle: data.eventTitle,
       };
     }
 

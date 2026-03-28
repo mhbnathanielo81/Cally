@@ -76,6 +76,8 @@ const baseProps = {
   couple: fakeCouple,
   currentUserName: 'Alex',
   onCreateEvent: jest.fn().mockResolvedValue(undefined),
+  onUpdateEvent: jest.fn().mockResolvedValue(undefined),
+  onDeleteEvent: jest.fn().mockResolvedValue(undefined),
 };
 
 // ── rendering ─────────────────────────────────────────────────────────────────
@@ -222,5 +224,140 @@ describe('CallyAssistant — Michigan scenario', () => {
     expect(screen.getByText(/Ann Arbor Trip/)).toBeInTheDocument();
     expect(screen.getByText(/Alex/)).toBeInTheDocument();
     expect(screen.getByText(/Jordan/)).toBeInTheDocument();
+  });
+});
+
+// ── Multi-event creation ──────────────────────────────────────────────────────
+
+describe('CallyAssistant — multi-event creation', () => {
+  it('calls onCreateEvent for each event and shows Cally reply', async () => {
+    const onCreateEvent = jest.fn().mockResolvedValue(undefined);
+    mockAskCally.mockResolvedValueOnce({
+      action: 'create_events',
+      reply: 'Done! I added 2 events to your calendar 💚',
+      events: [
+        { title: 'BBQ', day: 1, month: 7, year: 2026, time: '6:00 PM', location: '', notes: '', type: 'event' },
+        { title: 'Swim', day: 2, month: 7, year: 2026, time: '10:00 AM', location: '', notes: '', type: 'event' },
+      ],
+    });
+
+    render(<CallyAssistant {...baseProps} onCreateEvent={onCreateEvent} />);
+    fireEvent.click(screen.getByRole('button', { name: /ask cally/i }));
+    const input = screen.getByPlaceholderText('Ask Cally about your calendar…');
+    fireEvent.change(input, { target: { value: 'Add BBQ on July 1 and Swim on July 2' } });
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
+
+    await waitFor(() => expect(onCreateEvent).toHaveBeenCalledTimes(2));
+    expect(onCreateEvent).toHaveBeenCalledWith(expect.objectContaining({ title: 'BBQ' }));
+    expect(onCreateEvent).toHaveBeenCalledWith(expect.objectContaining({ title: 'Swim' }));
+    await waitFor(() => expect(screen.getByText(/2 events/)).toBeInTheDocument());
+  });
+});
+
+// ── Update event ──────────────────────────────────────────────────────────────
+
+describe('CallyAssistant — update event', () => {
+  const existingEvent = {
+    id: 'evt-bbq',
+    coupleId: 'couple-1',
+    title: 'BBQ Party',
+    time: '5:00 PM',
+    day: 1,
+    month: 7,
+    year: 2026,
+    createdBy: MY_UID,
+    type: 'event' as const,
+    createdAt: { toDate: () => new Date(), seconds: 0, nanoseconds: 0 } as any,
+    updatedAt: { toDate: () => new Date(), seconds: 0, nanoseconds: 0 } as any,
+  };
+
+  it('calls onUpdateEvent when event is found', async () => {
+    const onUpdateEvent = jest.fn().mockResolvedValue(undefined);
+    mockAskCally.mockResolvedValueOnce({
+      action: 'update_event',
+      reply: "Done! I updated 'BBQ Party' 💚",
+      update: { eventTitle: 'BBQ Party', changes: { time: '7:00 PM' } },
+    });
+
+    render(<CallyAssistant {...baseProps} events={[existingEvent]} onUpdateEvent={onUpdateEvent} />);
+    fireEvent.click(screen.getByRole('button', { name: /ask cally/i }));
+    const input = screen.getByPlaceholderText('Ask Cally about your calendar…');
+    fireEvent.change(input, { target: { value: 'Move BBQ Party to 7 PM' } });
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
+
+    await waitFor(() => expect(onUpdateEvent).toHaveBeenCalledWith('evt-bbq', { time: '7:00 PM' }));
+    await waitFor(() => expect(screen.getByText(/updated 'BBQ Party'/)).toBeInTheDocument());
+  });
+
+  it('shows not-found message when event title does not match', async () => {
+    const onUpdateEvent = jest.fn().mockResolvedValue(undefined);
+    mockAskCally.mockResolvedValueOnce({
+      action: 'update_event',
+      reply: "Done! 💚",
+      update: { eventTitle: 'Nonexistent Event', changes: { time: '7:00 PM' } },
+    });
+
+    render(<CallyAssistant {...baseProps} events={[existingEvent]} onUpdateEvent={onUpdateEvent} />);
+    fireEvent.click(screen.getByRole('button', { name: /ask cally/i }));
+    const input = screen.getByPlaceholderText('Ask Cally about your calendar…');
+    fireEvent.change(input, { target: { value: 'Move Nonexistent Event to 7 PM' } });
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
+
+    await waitFor(() => expect(screen.getByText(/couldn't find "Nonexistent Event"/)).toBeInTheDocument());
+    expect(onUpdateEvent).not.toHaveBeenCalled();
+  });
+});
+
+// ── Delete event ──────────────────────────────────────────────────────────────
+
+describe('CallyAssistant — delete event', () => {
+  const existingEvent = {
+    id: 'evt-bbq',
+    coupleId: 'couple-1',
+    title: 'BBQ Party',
+    time: '5:00 PM',
+    day: 1,
+    month: 7,
+    year: 2026,
+    createdBy: MY_UID,
+    type: 'event' as const,
+    createdAt: { toDate: () => new Date(), seconds: 0, nanoseconds: 0 } as any,
+    updatedAt: { toDate: () => new Date(), seconds: 0, nanoseconds: 0 } as any,
+  };
+
+  it('calls onDeleteEvent when event is found', async () => {
+    const onDeleteEvent = jest.fn().mockResolvedValue(undefined);
+    mockAskCally.mockResolvedValueOnce({
+      action: 'delete_event',
+      reply: "Done! I removed 'BBQ Party' from your calendar 💚",
+      deleteEventTitle: 'BBQ Party',
+    });
+
+    render(<CallyAssistant {...baseProps} events={[existingEvent]} onDeleteEvent={onDeleteEvent} />);
+    fireEvent.click(screen.getByRole('button', { name: /ask cally/i }));
+    const input = screen.getByPlaceholderText('Ask Cally about your calendar…');
+    fireEvent.change(input, { target: { value: 'Delete BBQ Party' } });
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
+
+    await waitFor(() => expect(onDeleteEvent).toHaveBeenCalledWith('evt-bbq'));
+    await waitFor(() => expect(screen.getByText(/removed 'BBQ Party'/)).toBeInTheDocument());
+  });
+
+  it('shows not-found message when event title does not match', async () => {
+    const onDeleteEvent = jest.fn().mockResolvedValue(undefined);
+    mockAskCally.mockResolvedValueOnce({
+      action: 'delete_event',
+      reply: "Done! 💚",
+      deleteEventTitle: 'Ghost Event',
+    });
+
+    render(<CallyAssistant {...baseProps} events={[existingEvent]} onDeleteEvent={onDeleteEvent} />);
+    fireEvent.click(screen.getByRole('button', { name: /ask cally/i }));
+    const input = screen.getByPlaceholderText('Ask Cally about your calendar…');
+    fireEvent.change(input, { target: { value: 'Delete Ghost Event' } });
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
+
+    await waitFor(() => expect(screen.getByText(/couldn't find "Ghost Event"/)).toBeInTheDocument());
+    expect(onDeleteEvent).not.toHaveBeenCalled();
   });
 });

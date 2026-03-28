@@ -76,6 +76,27 @@ Rules for event creation:
 - "Dinner on Friday" → you have enough: title is "Dinner", day is next Friday. Create it.
 - "Something next week" → ask: "I'd love to help! What's the event, and which day next week? 💚"
 
+## Multiple event creation
+If the user asks to add MULTIPLE events in one message, respond with ONLY this JSON — no other text before or after:
+
+{"action":"create_events","events":[{"title":"Event 1","day":27,"month":3,"year":2026,"time":"7:00 PM","location":"","notes":"","type":"event"},{"title":"Event 2","day":28,"month":3,"year":2026,"time":"12:00 PM","location":"","notes":"","type":"event"}],"message":"Done! I added 2 events to your calendar 💚"}
+
+Use "create_events" (plural) with an "events" array when there are 2 or more events. Use "create_event" (singular) with a single "event" object when there is exactly 1 event. All the same rules for date resolution, time format, location, and type apply to each event in the array.
+
+## Event editing via chat
+If the user asks to EDIT, UPDATE, CHANGE, MOVE, or RESCHEDULE an existing event, find the matching event from the calendar events list above. Respond with ONLY this JSON:
+
+{"action":"update_event","eventTitle":"Exact event title from list","changes":{"time":"8:00 PM"},"message":"Done! I updated 'Event title' 💚"}
+
+Rules: only include fields in "changes" that are changing. "eventTitle" must exactly match an event title from the calendar list. If ambiguous ask for clarification. If not found say so.
+
+## Event deletion via chat
+If the user asks to DELETE, REMOVE, or CANCEL an event, respond with ONLY this JSON:
+
+{"action":"delete_event","eventTitle":"Exact event title from list","message":"Done! I removed 'Event title' from your calendar 💚"}
+
+Rules: "eventTitle" must exactly match an event from the list. If ambiguous ask for confirmation. If not found say so.
+
 ## Important
 - When you create an event, the "message" field is what gets displayed to the user. Make it friendly and confirm what was created.
 - Only output the JSON block for event creation. For ALL other responses (questions, listing events, clarifications), respond with plain text only.`;
@@ -131,6 +152,28 @@ Rules for event creation:
             reply: parsed.message || 'Event created! 💚',
           });
         }
+        if (parsed.action === 'create_events' && Array.isArray(parsed.events)) {
+          return res.status(200).json({
+            action: 'create_events',
+            events: parsed.events,
+            reply: parsed.message || 'Events created! 💚',
+          });
+        }
+        if (parsed.action === 'update_event' && parsed.eventTitle) {
+          return res.status(200).json({
+            action: 'update_event',
+            eventTitle: parsed.eventTitle,
+            changes: parsed.changes || {},
+            reply: parsed.message || 'Event updated! 💚',
+          });
+        }
+        if (parsed.action === 'delete_event' && parsed.eventTitle) {
+          return res.status(200).json({
+            action: 'delete_event',
+            eventTitle: parsed.eventTitle,
+            reply: parsed.message || 'Event deleted! 💚',
+          });
+        }
       } catch {
         // JSON parse failed — treat as a normal text reply
       }
@@ -146,6 +189,28 @@ Rules for event creation:
             action: 'create_event',
             event: parsed.event,
             reply: parsed.message || 'Event created! 💚',
+          });
+        }
+        if (parsed.action === 'create_events' && Array.isArray(parsed.events)) {
+          return res.status(200).json({
+            action: 'create_events',
+            events: parsed.events,
+            reply: parsed.message || 'Events created! 💚',
+          });
+        }
+        if (parsed.action === 'update_event' && parsed.eventTitle) {
+          return res.status(200).json({
+            action: 'update_event',
+            eventTitle: parsed.eventTitle,
+            changes: parsed.changes || {},
+            reply: parsed.message || 'Event updated! 💚',
+          });
+        }
+        if (parsed.action === 'delete_event' && parsed.eventTitle) {
+          return res.status(200).json({
+            action: 'delete_event',
+            eventTitle: parsed.eventTitle,
+            reply: parsed.message || 'Event deleted! 💚',
           });
         }
       } catch {
