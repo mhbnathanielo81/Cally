@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { User } from 'firebase/auth';
-import { onAuthChange } from '@/lib/auth';
+import { onAuthChange, handleRedirectResult } from '@/lib/auth';
 import { getUserProfile } from '@/lib/firestore';
 import { UserProfile } from '@/types';
 
@@ -17,6 +17,9 @@ export function useAuth(): AuthState {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Process redirect result when page loads after Google sign-in redirect
+    handleRedirectResult();
+
     const unsub = onAuthChange(async (u) => {
       setUser(u);
       if (u) {
