@@ -88,6 +88,23 @@ function generateInviteCode(): string {
 
 export async function createCouple(user: User): Promise<string> {
   const db = getDbInstance();
+  
+  // Guard: prevent creating a new couple if user already belongs to one
+  const userSnap = await getDoc(doc(db, 'users', user.uid));
+  if (userSnap.exists()) {
+    const userData = userSnap.data() as UserProfile;
+    if (userData.coupleId) {
+      const existingCouple = await getDoc(doc(db, 'couples', userData.coupleId));
+      if (existingCouple.exists()) {
+        const coupleData = existingCouple.data() as Couple;
+        if (coupleData.status === 'pending') {
+          return coupleData.inviteCode;  // Return existing code instead of creating a new one
+        }
+        throw new Error('You are already paired.');
+      }
+    }
+  }
+
   const coupleRef = doc(collection(db, 'couples'));
   const inviteCode = generateInviteCode();
   const coupleId = coupleRef.id;
