@@ -12,8 +12,8 @@ import {
   serverTimestamp,
   Timestamp,
   getDocs,
-  orderBy,
   limit,
+  writeBatch,
 } from 'firebase/firestore';
 import { User, updateProfile } from 'firebase/auth';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -58,6 +58,16 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
   return snap.exists() ? (snap.data() as UserProfile) : null;
 }
 
+export function subscribeToUserProfile(
+  uid: string,
+  callback: (profile: UserProfile | null) => void,
+): () => void {
+  const db = getDbInstance();
+  return onSnapshot(doc(db, 'users', uid), (snap) => {
+    callback(snap.exists() ? (snap.data() as UserProfile) : null);
+  });
+}
+
 export async function updateFcmToken(uid: string, token: string): Promise<void> {
   const db = getDbInstance();
   await updateDoc(doc(db, 'users', uid), { fcmToken: token, updatedAt: serverTimestamp() });
@@ -84,6 +94,29 @@ export async function uploadProfilePhoto(uid: string, file: File): Promise<strin
 /* ---- Couples ---- */
 function generateInviteCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+/**
+ * Migrate events whose coupleId equals `fromCoupleId` to `toCoupleId`.
+ * Used when a user creates or joins a couple so that their previously-solo
+ * events become visible on the shared calendar.
+ */
+export async function migrateEventsToCouple(
+  fromCoupleId: string,
+  toCoupleId: string,
+): Promise<void> {
+  if (fromCoupleId === toCoupleId) return;
+  const db = getDbInstance();
+  try {
+    const q = query(collection(db, 'events'), where('coupleId', '==', fromCoupleId));
+    const snap = await getDocs(q);
+    if (snap.empty) return;
+    const batch = writeBatch(db);
+    snap.docs.forEach((d) => batch.update(d.ref, { coupleId: toCoupleId }));
+    await batch.commit();
+  } catch (err) {
+    console.error('[Cally] migrateEventsToCouple error:', err);
+  }
 }
 
 export async function createCouple(user: User): Promise<string> {
@@ -123,6 +156,8 @@ export async function createCouple(user: User): Promise<string> {
     updatedAt: serverTimestamp(),
   });
   await updateDoc(doc(db, 'users', user.uid), { coupleId, updatedAt: serverTimestamp() });
+  // Migrate any events this user added before creating the couple
+  await migrateEventsToCouple(user.uid, coupleId);
   return inviteCode;
 }
 
@@ -158,6 +193,8 @@ export async function joinCouple(user: User, inviteCode: string): Promise<void> 
     coupleId: couple.coupleId,
     updatedAt: serverTimestamp(),
   });
+  // Migrate any events user2 added before joining the couple
+  await migrateEventsToCouple(user.uid, couple.coupleId);
 }
 
 export function subscribeToCouple(coupleId: string, callback: (couple: Couple | null) => void) {
@@ -292,16 +329,23 @@ export function subscribeToEventHistory(
   callback: (entries: EventHistoryEntry[]) => void,
 ) {
   const db = getDbInstance();
+  // Avoid a composite index requirement (which may not be deployed on Vercel)
+  // by omitting orderBy here and sorting client-side instead.
   const q = query(
     collection(db, 'eventHistory'),
     where('coupleId', '==', coupleId),
-    orderBy('changedAt', 'desc'),
     limit(100),
   );
   return onSnapshot(
     q,
     (snap) => {
-      const entries = snap.docs.map((d) => ({ id: d.id, ...d.data() } as EventHistoryEntry));
+      const entries = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() } as EventHistoryEntry))
+        .sort((a, b) => {
+          const ta = a.changedAt?.toMillis?.() ?? 0;
+          const tb = b.changedAt?.toMillis?.() ?? 0;
+          return tb - ta; // Most recent first
+        });
       callback(entries);
     },
     (error) => {
