@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,7 +14,7 @@ import CoupleLinkModal from '@/components/CoupleLinkModal';
 import ProfileMenu from '@/components/ProfileMenu';
 import CallyAssistant from '@/components/CallyAssistant';
 import { CallyEvent } from '@/types';
-import { addEvent, updateEvent, deleteEvent } from '@/lib/firestore';
+import { addEvent, updateEvent, deleteEvent, migrateEventsToCouple } from '@/lib/firestore';
 import { requestNotificationPermission, setupForegroundMessages } from '@/lib/messaging';
 
 export default function CalendarPage() {
@@ -35,6 +35,8 @@ export default function CalendarPage() {
   const { couple } = useCouple(coupleId);
 
   const currentUserName = profile?.displayName ?? user?.displayName ?? '';
+  // Track whether we've already attempted the one-time legacy migration this session.
+  const migrationAttempted = useRef(false);
 
   // Redirect unauthenticated users
   useEffect(() => {
@@ -48,6 +50,17 @@ export default function CalendarPage() {
       setupForegroundMessages();
     }
   }, [user]);
+
+  // Safety-net: if the user already has a shared coupleId but still has
+  // events stored under their personal uid (created before they paired),
+  // migrate those events to the shared namespace so both partners see them.
+  // We only attempt this once per session to avoid repeated Firestore reads.
+  useEffect(() => {
+    if (user && coupleId && coupleId !== user.uid && !migrationAttempted.current) {
+      migrationAttempted.current = true;
+      migrateEventsToCouple(user.uid, coupleId);
+    }
+  }, [user, coupleId]);
 
   const handleCoupleLinked = useCallback(async () => {
     setShowCoupleModal(false);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
 import { createCouple, joinCouple } from '@/lib/firestore';
 import { Couple } from '@/types';
@@ -26,6 +26,14 @@ export default function CoupleLinkModal({ user, couple, onLinked, onClose }: Pro
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+
+  // When the partner joins (couple.status flips to 'linked' via real-time
+  // Firestore subscription), update the modal to show the linked state.
+  useEffect(() => {
+    if (couple?.status === 'linked') {
+      setMode('linked');
+    }
+  }, [couple?.status]);
 
   // Derive the invite link from the code so there is a single source of truth
   const inviteLink = inviteCode && typeof window !== 'undefined'
