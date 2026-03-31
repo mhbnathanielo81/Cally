@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { User } from 'firebase/auth';
 import { onAuthChange, handleRedirectResult } from '@/lib/auth';
-import { getUserProfile } from '@/lib/firestore';
+import { getUserProfile, subscribeToUserProfile } from '@/lib/firestore';
 import { UserProfile } from '@/types';
 
 export interface AuthState {
@@ -20,17 +20,30 @@ export function useAuth(): AuthState {
     // Process redirect result when page loads after Google sign-in redirect
     handleRedirectResult();
 
+    let unsubProfile: (() => void) | null = null;
+
     const unsub = onAuthChange(async (u) => {
       setUser(u);
+      // Clean up previous profile subscription
+      if (unsubProfile) {
+        unsubProfile();
+        unsubProfile = null;
+      }
       if (u) {
-        const p = await getUserProfile(u.uid);
-        setProfile(p);
+        // Use real-time subscription so coupleId changes propagate instantly
+        unsubProfile = subscribeToUserProfile(u.uid, (p) => {
+          setProfile(p);
+          setLoading(false);
+        });
       } else {
         setProfile(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
-    return unsub;
+    return () => {
+      unsub();
+      if (unsubProfile) unsubProfile();
+    };
   }, []);
 
   const refreshProfile = useCallback(async () => {

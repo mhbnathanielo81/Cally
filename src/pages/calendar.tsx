@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,7 +14,7 @@ import CoupleLinkModal from '@/components/CoupleLinkModal';
 import ProfileMenu from '@/components/ProfileMenu';
 import CallyAssistant from '@/components/CallyAssistant';
 import { CallyEvent } from '@/types';
-import { addEvent, updateEvent, deleteEvent } from '@/lib/firestore';
+import { addEvent, updateEvent, deleteEvent, migrateEventsToCouple } from '@/lib/firestore';
 import { requestNotificationPermission, setupForegroundMessages } from '@/lib/messaging';
 
 export default function CalendarPage() {
@@ -33,6 +33,14 @@ export default function CalendarPage() {
   const coupleId = profile?.coupleId ?? null;
   const { events } = useEvents(coupleId || user?.uid || null);
   const { couple } = useCouple(coupleId);
+
+  // Safety-net: migrate legacy solo events for users already paired before this fix
+  const migrationRan = useRef(false);
+  useEffect(() => {
+    if (!user || !coupleId || coupleId === user.uid || migrationRan.current) return;
+    migrationRan.current = true;
+    migrateEventsToCouple(user.uid, coupleId).catch(console.error);
+  }, [user, coupleId]);
 
   const currentUserName = profile?.displayName ?? user?.displayName ?? '';
 

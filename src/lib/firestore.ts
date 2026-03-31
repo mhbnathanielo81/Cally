@@ -12,8 +12,6 @@ import {
   serverTimestamp,
   Timestamp,
   getDocs,
-  orderBy,
-  limit,
 } from 'firebase/firestore';
 import { User, updateProfile } from 'firebase/auth';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -123,6 +121,8 @@ export async function createCouple(user: User): Promise<string> {
     updatedAt: serverTimestamp(),
   });
   await updateDoc(doc(db, 'users', user.uid), { coupleId, updatedAt: serverTimestamp() });
+  // Migrate any events created while solo (coupleId = uid) to the shared namespace
+  await migrateEventsToCouple(user.uid, coupleId);
   return inviteCode;
 }
 
@@ -158,6 +158,8 @@ export async function joinCouple(user: User, inviteCode: string): Promise<void> 
     coupleId: couple.coupleId,
     updatedAt: serverTimestamp(),
   });
+  // Migrate any events user2 created while solo to the shared couple namespace
+  await migrateEventsToCouple(user.uid, couple.coupleId);
 }
 
 export function subscribeToCouple(coupleId: string, callback: (couple: Couple | null) => void) {
@@ -292,21 +294,75 @@ export function subscribeToEventHistory(
   callback: (entries: EventHistoryEntry[]) => void,
 ) {
   const db = getDbInstance();
+  // No orderBy — avoids needing a composite index that must be deployed via
+  // `firebase deploy --only firestore:indexes`. Sort client-side instead.
   const q = query(
     collection(db, 'eventHistory'),
     where('coupleId', '==', coupleId),
-    orderBy('changedAt', 'desc'),
-    limit(100),
   );
   return onSnapshot(
     q,
     (snap) => {
-      const entries = snap.docs.map((d) => ({ id: d.id, ...d.data() } as EventHistoryEntry));
+      const entries = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() } as EventHistoryEntry))
+        .sort((a, b) => {
+          const aTime = a.changedAt?.toMillis?.() ?? 0;
+          const bTime = b.changedAt?.toMillis?.() ?? 0;
+          return bTime - aTime; // descending
+        });
       callback(entries);
     },
     (error) => {
       console.error('[Cally] subscribeToEventHistory error:', error);
       callback([]);
+    },
+  );
+}
+
+/* ---- Event migration (solo → couple) ---- */
+
+/**
+ * When two users link calendars, events created while solo (coupleId = uid)
+ * need to be moved to the shared couple namespace (coupleId = couple doc id).
+ */
+export async function migrateEventsToCouple(fromCoupleId: string, toCoupleId: string): Promise<number> {
+  if (fromCoupleId === toCoupleId) return 0;
+  const db = getDbInstance();
+  const q = query(collection(db, 'events'), where('coupleId', '==', fromCoupleId));
+  const snap = await getDocs(q);
+  if (snap.empty) return 0;
+
+  const { writeBatch } = await import('firebase/firestore');
+  const batch = writeBatch(db);
+  snap.docs.forEach((d) => {
+    batch.update(d.ref, { coupleId: toCoupleId, updatedAt: serverTimestamp() });
+  });
+  await batch.commit();
+
+  // Also migrate any eventHistory entries
+  const hq = query(collection(db, 'eventHistory'), where('coupleId', '==', fromCoupleId));
+  const hsnap = await getDocs(hq);
+  if (!hsnap.empty) {
+    const hbatch = writeBatch(db);
+    hsnap.docs.forEach((d) => {
+      hbatch.update(d.ref, { coupleId: toCoupleId });
+    });
+    await hbatch.commit();
+  }
+
+  return snap.size;
+}
+
+/* ---- Real-time user profile subscription ---- */
+export function subscribeToUserProfile(uid: string, callback: (profile: UserProfile | null) => void) {
+  const db = getDbInstance();
+  return onSnapshot(
+    doc(db, 'users', uid),
+    (snap) => {
+      callback(snap.exists() ? (snap.data() as UserProfile) : null);
+    },
+    (error) => {
+      console.error('[Cally] subscribeToUserProfile error:', error);
     },
   );
 }

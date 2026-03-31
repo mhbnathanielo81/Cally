@@ -43,19 +43,24 @@ service cloud.firestore {
 
     // ── Events ─────────────────────────────────────────────────────────────
     // Both partners of a couple can CRUD events that belong to their couple.
+    // Solo users (not yet paired) use coupleId == their own uid.
     match /events/{eventId} {
       allow read: if isSignedIn()
-                  && isEventPartner(resource.data.coupleId);
+                  && (resource.data.coupleId == request.auth.uid
+                      || isEventPartner(resource.data.coupleId));
 
       allow create: if isSignedIn()
                     && request.resource.data.createdBy == request.auth.uid
-                    && isEventPartner(request.resource.data.coupleId);
+                    && (request.resource.data.coupleId == request.auth.uid
+                        || isEventPartner(request.resource.data.coupleId));
 
       allow update: if isSignedIn()
-                    && isEventPartner(resource.data.coupleId);
+                    && (resource.data.coupleId == request.auth.uid
+                        || isEventPartner(resource.data.coupleId));
 
       allow delete: if isSignedIn()
-                    && isEventPartner(resource.data.coupleId);
+                    && (resource.data.coupleId == request.auth.uid
+                        || isEventPartner(resource.data.coupleId));
     }
 
     // ── User profiles ──────────────────────────────────────────────────────
@@ -77,16 +82,24 @@ service cloud.firestore {
 
     // ── Event history (audit log) ──────────────────────────────────────────
     // Both partners can read history entries for their couple.
-    // Entries are written server-side after mutations; they are immutable once created.
+    // Solo users can read/write their own history (coupleId == uid).
+    // Entries are immutable once created.
     match /eventHistory/{historyId} {
       allow read: if isSignedIn()
-                  && isEventPartner(resource.data.coupleId);
+                  && (resource.data.coupleId == request.auth.uid
+                      || isEventPartner(resource.data.coupleId));
 
       allow create: if isSignedIn()
                     && request.resource.data.changedBy == request.auth.uid
-                    && isEventPartner(request.resource.data.coupleId);
+                    && (request.resource.data.coupleId == request.auth.uid
+                        || isEventPartner(request.resource.data.coupleId));
 
-      allow update, delete: if false;
+      // Allow updating coupleId during migration (solo → couple)
+      allow update: if isSignedIn()
+                    && (resource.data.coupleId == request.auth.uid
+                        || isEventPartner(resource.data.coupleId));
+
+      allow delete: if false;
     }
 
     // Default deny on everything else (Firestore built-in behavior).
