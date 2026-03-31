@@ -14,7 +14,7 @@ import CoupleLinkModal from '@/components/CoupleLinkModal';
 import ProfileMenu from '@/components/ProfileMenu';
 import CallyAssistant from '@/components/CallyAssistant';
 import { CallyEvent } from '@/types';
-import { addEvent, updateEvent, deleteEvent, migrateEventsToCouple } from '@/lib/firestore';
+import { addEvent, updateEvent, deleteEvent, resolveUserCouple } from '@/lib/firestore';
 import { requestNotificationPermission, setupForegroundMessages } from '@/lib/messaging';
 
 export default function CalendarPage() {
@@ -34,13 +34,15 @@ export default function CalendarPage() {
   const { events } = useEvents(coupleId || user?.uid || null);
   const { couple } = useCouple(coupleId);
 
-  // Safety-net: migrate legacy solo events for users already paired before this fix
-  const migrationRan = useRef(false);
+  // Self-healing: detect and fix mismatched couple associations.
+  // This handles the case where a user's coupleId points to a stale pending
+  // couple while they're actually linked in a different couple document.
+  const resolutionRan = useRef(false);
   useEffect(() => {
-    if (!user || !coupleId || coupleId === user.uid || migrationRan.current) return;
-    migrationRan.current = true;
-    migrateEventsToCouple(user.uid, coupleId).catch(console.error);
-  }, [user, coupleId]);
+    if (!user || resolutionRan.current) return;
+    resolutionRan.current = true;
+    resolveUserCouple(user.uid).catch(console.error);
+  }, [user]);
 
   const currentUserName = profile?.displayName ?? user?.displayName ?? '';
 

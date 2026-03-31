@@ -103,6 +103,18 @@ export async function createCouple(user: User): Promise<string> {
     }
   }
 
+  // Extra guard: check if user is already user1 or user2 in a linked couple
+  // (their profile.coupleId might be stale or pointing elsewhere)
+  const linkedCoupleId = await findLinkedCoupleForUser(db, user.uid);
+  if (linkedCoupleId) {
+    // Fix the user's profile and reject the create
+    await updateDoc(doc(db, 'users', user.uid), {
+      coupleId: linkedCoupleId,
+      updatedAt: serverTimestamp(),
+    });
+    throw new Error('You are already paired. Refresh the page to see your linked calendar.');
+  }
+
   const coupleRef = doc(collection(db, 'couples'));
   const inviteCode = generateInviteCode();
   const coupleId = coupleRef.id;
@@ -365,4 +377,79 @@ export function subscribeToUserProfile(uid: string, callback: (profile: UserProf
       console.error('[Cally] subscribeToUserProfile error:', error);
     },
   );
+}
+
+/* ---- Couple resolution (self-healing) ---- */
+
+/**
+ * Detects and fixes the case where a user's coupleId points to the wrong
+ * couple document (e.g. a stale pending couple from a failed pairing attempt)
+ * while they're actually user2 in a different linked couple.
+ *
+ * Returns the correct coupleId, or null if the user isn't in any linked couple.
+ */
+export async function resolveUserCouple(uid: string): Promise<string | null> {
+  const db = getDbInstance();
+
+  const userSnap = await getDoc(doc(db, 'users', uid));
+  if (!userSnap.exists()) return null;
+  const userData = userSnap.data() as UserProfile;
+
+  // 1. Check if current coupleId already points to a valid linked couple
+  if (userData.coupleId) {
+    const coupleSnap = await getDoc(doc(db, 'couples', userData.coupleId));
+    if (coupleSnap.exists()) {
+      const c = coupleSnap.data() as Couple;
+      if (c.status === 'linked' && (c.user1 === uid || c.user2 === uid)) {
+        // Already correct — just make sure events are migrated
+        await migrateEventsToCouple(uid, userData.coupleId);
+        return userData.coupleId;
+      }
+    }
+  }
+
+  // 2. Current coupleId is missing, stale, or points to a pending couple.
+  //    Search for any linked couple where this user is a member.
+  const linkedCoupleId = await findLinkedCoupleForUser(db, uid);
+
+  if (linkedCoupleId) {
+    // Found a linked couple — fix the user's profile to point to it
+    await updateDoc(doc(db, 'users', uid), {
+      coupleId: linkedCoupleId,
+      updatedAt: serverTimestamp(),
+    });
+    // Migrate solo events + events from any stale pending couple
+    await migrateEventsToCouple(uid, linkedCoupleId);
+    if (userData.coupleId && userData.coupleId !== linkedCoupleId) {
+      await migrateEventsToCouple(userData.coupleId, linkedCoupleId);
+    }
+    return linkedCoupleId;
+  }
+
+  // 3. No linked couple found — leave as-is
+  return userData.coupleId;
+}
+
+/**
+ * Search the couples collection for any linked couple where uid is user1 or user2.
+ */
+async function findLinkedCoupleForUser(
+  db: ReturnType<typeof getDbInstance>,
+  uid: string,
+): Promise<string | null> {
+  // Check as user1
+  const q1 = query(collection(db, 'couples'), where('user1', '==', uid));
+  const snap1 = await getDocs(q1);
+  for (const d of snap1.docs) {
+    const c = d.data() as Couple;
+    if (c.status === 'linked') return c.coupleId;
+  }
+  // Check as user2
+  const q2 = query(collection(db, 'couples'), where('user2', '==', uid));
+  const snap2 = await getDocs(q2);
+  for (const d of snap2.docs) {
+    const c = d.data() as Couple;
+    if (c.status === 'linked') return c.coupleId;
+  }
+  return null;
 }
