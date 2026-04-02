@@ -32,8 +32,8 @@ export default function EventDetailModal({ event, currentUid, currentUserName = 
   const [error, setError] = useState('');
 
   const color = getEventColor(event.createdBy, currentUid, event.type);
-  const canEdit = event.createdBy === currentUid;
-  // Both the creator and their partner can delete an event from the shared calendar
+  // Both partners in a shared calendar can edit and delete events
+  const canEdit = true;
   const canDelete = true;
 
   const handleSave = async (e: React.FormEvent) => {
