@@ -55,7 +55,9 @@ export default function CalendarPage() {
   useEffect(() => {
     if (user) {
       requestNotificationPermission(user.uid);
-      setupForegroundMessages();
+      let unsubscribe: (() => void) | undefined;
+      setupForegroundMessages().then((unsub) => { unsubscribe = unsub; });
+      return () => { unsubscribe?.(); };
     }
   }, [user]);
 

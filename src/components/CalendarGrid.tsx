@@ -119,6 +119,7 @@ export default function CalendarGrid({ month, year, events, currentUid, onDayCli
                     background: 'var(--color-primary)',
                     border: 'none',
                     color: '#000',
+                      border: 'none',
                     fontSize: '1rem',
                     lineHeight: '22px',
                     textAlign: 'center',
@@ -143,6 +144,7 @@ export default function CalendarGrid({ month, year, events, currentUid, onDayCli
                     style={{
                       background: getEventColor(ev.createdBy, currentUid, ev.type),
                       color: '#000',
+                      border: 'none',
                       borderRadius: 4,
                       padding: '2px 6px',
                       fontSize: '0.7rem',
@@ -154,6 +156,7 @@ export default function CalendarGrid({ month, year, events, currentUid, onDayCli
                       minWidth: 0,
                       fontWeight: 600,
                       display: 'block',
+                      cursor: 'pointer',
                     }}
                   >
                     {ev.title}

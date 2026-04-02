@@ -62,7 +62,7 @@ export default function CallyAssistant({
 
     try {
       // Pass conversation history (last 10 messages = 5 exchanges) for memory
-      const historyForContext = [...messages, userMsg].slice(-10);
+      const historyForContext = [...messages].slice(-10);
       const response: CallyResponse = await askCally(
         q,
         events,
