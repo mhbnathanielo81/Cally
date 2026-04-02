@@ -34,8 +34,17 @@ service cloud.firestore {
                     && (request.resource.data.user1 == request.auth.uid
                         || request.resource.data.user2 == request.auth.uid);
 
+      // Allow existing partners to update, OR allow a new user to join a
+      // pending couple by setting themselves as user2.  Without the second
+      // clause, user2's UID isn't in the existing document yet, so the
+      // isCouplePartner check fails and the join is silently denied.
+      // The invite code itself is validated client-side in joinCouple().
       allow update: if isSignedIn()
-                    && isCouplePartner(resource);
+                    && (isCouplePartner(resource)
+                        || (resource.data.status == 'pending'
+                            && resource.data.user2 == null
+                            && request.resource.data.user2 == request.auth.uid
+                            && request.resource.data.user1 == resource.data.user1));
 
       allow delete: if isSignedIn()
                     && isCouplePartner(resource);

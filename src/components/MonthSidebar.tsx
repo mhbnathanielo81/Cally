@@ -12,11 +12,11 @@ export default function MonthSidebar({ selectedMonth, selectedYear, onMonthChang
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 1 + i);
 
   return (
-    <aside style={{ width: 120, display: 'flex', flexDirection: 'column', gap: 8, padding: '16px 8px', borderLeft: '1px solid var(--color-border)', minHeight: '100%' }}>
+    <aside style={{ width: 76, display: 'flex', flexDirection: 'column', gap: 6, padding: '16px 4px', borderLeft: '1px solid var(--color-border)', minHeight: '100%' }}>
       <select
         value={selectedYear}
         onChange={(e) => onYearChange(Number(e.target.value))}
-        style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-btn)', padding: '6px 8px', color: 'var(--color-text)', marginBottom: 8, width: '100%' }}
+        style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-btn)', padding: '4px 4px', color: 'var(--color-text)', marginBottom: 6, width: '100%', fontSize: '0.8rem' }}
       >
         {years.map((y) => <option key={y} value={y}>{y}</option>)}
       </select>
@@ -33,8 +33,8 @@ export default function MonthSidebar({ selectedMonth, selectedYear, onMonthChang
               fontWeight: active ? 700 : 400,
               border: '1px solid ' + (active ? 'var(--color-primary)' : 'transparent'),
               borderRadius: 'var(--radius-btn)',
-              padding: '6px 0',
-              fontSize: '0.85rem',
+              padding: '4px 0',
+              fontSize: '0.78rem',
               transition: 'all 0.15s',
             }}
           >

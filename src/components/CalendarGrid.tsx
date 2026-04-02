@@ -119,6 +119,8 @@ export default function CalendarGrid({ month, year, events, currentUid, onDayCli
                     background: 'var(--color-primary)',
                     border: 'none',
                     color: '#000',
+                    fontSize: '1rem',
+                    lineHeight: '22px',
                     textAlign: 'center',
                     cursor: 'pointer',
                     padding: 0,
