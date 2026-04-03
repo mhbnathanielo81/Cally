@@ -44,7 +44,6 @@ interface Props {
 
 const DEFAULT_START = 6 * 60;  // 6:00 AM
 const DEFAULT_END = 22 * 60;   // 10:00 PM
-const PX_PER_MINUTE = 1.8;
 const TICK_15 = 15;
 
 export default function DayTimelineModal({
@@ -67,43 +66,46 @@ export default function DayTimelineModal({
     for (const e of dayEvents) {
       const eStart = timeToMinutes(e.time);
       const eEnd = e.endTime ? timeToMinutes(e.endTime) : eStart + 15;
-      if (eStart < start) start = Math.floor(eStart / 60) * 60; // round down to hour
-      if (eEnd > end) end = Math.ceil(eEnd / 60) * 60; // round up to hour
+      if (eStart < start) start = Math.floor(eStart / 60) * 60;
+      if (eEnd > end) end = Math.ceil(eEnd / 60) * 60;
     }
     return { viewStart: start, viewEnd: end };
   }, [dayEvents]);
 
   const totalMinutes = viewEnd - viewStart;
-  const totalHeight = totalMinutes * PX_PER_MINUTE;
 
   const weekday = DOW[new Date(year, month - 1, day).getDay()];
 
-  // Partner name
   const partnerName = couple
     ? (couple.user1 === currentUid
         ? couple.user2DisplayName
         : couple.user1DisplayName) || 'Partner'
     : 'Partner';
 
-  /** Render an event block positioned on the timeline */
+  /** Convert minutes to a percentage position within the timeline */
+  function minutesToPercent(mins: number): number {
+    return ((mins - viewStart) / totalMinutes) * 100;
+  }
+
+  /** Render an event block positioned on the timeline using percentages */
   function renderEventBlock(ev: CallyEvent) {
     const startMins = timeToMinutes(ev.time);
     const endMins = ev.endTime ? timeToMinutes(ev.endTime) : startMins + 15;
     const duration = Math.max(endMins - startMins, 5);
-    const top = (startMins - viewStart) * PX_PER_MINUTE;
-    const height = duration * PX_PER_MINUTE;
+    const topPct = minutesToPercent(startMins);
+    const heightPct = (duration / totalMinutes) * 100;
     const color = getEventColor(ev.createdBy, currentUid, ev.type);
 
     return (
       <button
         key={ev.id}
-        onClick={() => onEventClick(ev)}
+        onClick={(e) => { e.stopPropagation(); onEventClick(ev); }}
         style={{
           position: 'absolute',
-          top,
+          top: `${topPct}%`,
           left: 4,
           right: 4,
-          height: Math.max(height, 14),
+          height: `${Math.max(heightPct, 0.8)}%`,
           background: color,
           border: 'none',
           borderRadius: 4,
@@ -122,7 +124,7 @@ export default function DayTimelineModal({
         title={`${ev.title} — ${ev.time}${ev.endTime ? ' to ' + ev.endTime : ''}`}
       >
         <span style={{
-          fontSize: height > 30 ? '0.72rem' : '0.62rem',
+          fontSize: '0.68rem',
           fontWeight: 700,
           color: '#000',
           lineHeight: 1.2,
@@ -132,43 +134,43 @@ export default function DayTimelineModal({
         }}>
           {ev.title}
         </span>
-        {height > 28 && (
-          <span style={{ fontSize: '0.6rem', color: 'rgba(0,0,0,0.7)', lineHeight: 1.2 }}>
+        {heightPct > 3 && (
+          <span style={{ fontSize: '0.58rem', color: 'rgba(0,0,0,0.7)', lineHeight: 1.2 }}>
             {ev.time}
-          </span>
-        )}
-        {height > 44 && ev.location && (
-          <span style={{ fontSize: '0.58rem', color: 'rgba(0,0,0,0.55)', lineHeight: 1.2 }}>
-            {ev.location}
           </span>
         )}
       </button>
     );
   }
 
-  /** Generate time ticks and labels */
+  /** Generate time ticks and labels using percentages */
   function renderTimeTicks() {
     const ticks = [];
     for (let m = viewStart; m <= viewEnd; m += TICK_15) {
-      const top = (m - viewStart) * PX_PER_MINUTE;
+      const topPct = minutesToPercent(m);
       const isHour = m % 60 === 0;
       ticks.push(
-        <div key={m} style={{ position: 'absolute', top, left: 0, right: 0, display: 'flex', alignItems: 'flex-start' }}>
-          {/* Label — only on the hour */}
+        <div key={m} style={{
+          position: 'absolute',
+          top: `${topPct}%`,
+          left: 0,
+          right: 0,
+          display: 'flex',
+          alignItems: 'flex-start',
+        }}>
           <span style={{
-            width: 52,
-            fontSize: '0.65rem',
+            width: 48,
+            fontSize: '0.6rem',
             color: isHour ? 'var(--color-muted)' : 'transparent',
             textAlign: 'right',
-            paddingRight: 6,
+            paddingRight: 4,
             lineHeight: 1,
-            transform: 'translateY(-5px)',
+            transform: 'translateY(-4px)',
             flexShrink: 0,
             userSelect: 'none',
           }}>
             {isHour ? minutesToTime(m) : ''}
           </span>
-          {/* Tick line */}
           <div style={{
             flex: 1,
             height: isHour ? 1 : 0.5,
@@ -180,10 +182,11 @@ export default function DayTimelineModal({
     return ticks;
   }
 
-  function handleTimelineClick(e: React.MouseEvent<HTMLDivElement>, column: 'user' | 'partner') {
+  function handleTimelineClick(e: React.MouseEvent<HTMLDivElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
     const y = e.clientY - rect.top;
-    const minutes = Math.round((y / PX_PER_MINUTE + viewStart) / 15) * 15;
+    const pct = y / rect.height;
+    const minutes = Math.round((pct * totalMinutes + viewStart) / 15) * 15;
     onAddEvent(minutesToTime(minutes));
   }
 
@@ -196,7 +199,7 @@ export default function DayTimelineModal({
         background: 'rgba(0,0,0,0.85)',
         zIndex: 100,
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'stretch',
         justifyContent: 'center',
       }}
     >
@@ -205,18 +208,15 @@ export default function DayTimelineModal({
         style={{
           width: '100%',
           height: '100%',
-          maxWidth: '100vw',
-          maxHeight: '100vh',
           background: 'var(--color-bg)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          position: 'relative',
         }}
       >
         {/* Header */}
         <div style={{
-          padding: '12px 16px',
+          padding: '10px 16px',
           borderBottom: '1px solid var(--color-border)',
           display: 'flex',
           alignItems: 'center',
@@ -225,28 +225,28 @@ export default function DayTimelineModal({
           background: 'var(--color-surface)',
         }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>
+            <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>
               {weekday}, {MONTH_NAMES[month - 1]} {day}, {year}
             </h2>
-            <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--color-muted)' }}>
+            <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: 'var(--color-muted)' }}>
               {dayEvents.length} event{dayEvents.length !== 1 ? 's' : ''} scheduled
             </p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
               onClick={() => onAddEvent()}
               style={{
                 background: 'var(--color-primary)',
                 border: 'none',
                 borderRadius: 8,
-                padding: '8px 16px',
+                padding: '6px 14px',
                 color: '#000',
                 fontWeight: 700,
-                fontSize: '0.82rem',
+                fontSize: '0.78rem',
                 cursor: 'pointer',
               }}
             >
-              + Add Event
+              + Add
             </button>
             <button
               onClick={onClose}
@@ -255,14 +255,14 @@ export default function DayTimelineModal({
                 background: 'none',
                 border: '1px solid var(--color-border)',
                 borderRadius: 8,
-                width: 36,
-                height: 36,
+                width: 32,
+                height: 32,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
                 color: 'var(--color-muted)',
-                fontSize: '1.2rem',
+                fontSize: '1.1rem',
               }}
             >
               ✕
@@ -277,13 +277,11 @@ export default function DayTimelineModal({
           flexShrink: 0,
           background: 'var(--color-surface)',
         }}>
-          {/* Time label spacer */}
-          <div style={{ width: 58, flexShrink: 0 }} />
-          {/* User column header */}
+          <div style={{ width: 52, flexShrink: 0 }} />
           <div style={{
             flex: 1,
-            padding: '8px 8px',
-            fontSize: '0.78rem',
+            padding: '6px 8px',
+            fontSize: '0.72rem',
             fontWeight: 700,
             color: '#1DB954',
             borderLeft: '1px solid var(--color-border)',
@@ -291,11 +289,10 @@ export default function DayTimelineModal({
           }}>
             {currentUserName || 'You'}
           </div>
-          {/* Partner column header */}
           <div style={{
             flex: 1,
-            padding: '8px 8px',
-            fontSize: '0.78rem',
+            padding: '6px 8px',
+            fontSize: '0.72rem',
             fontWeight: 700,
             color: '#4A90D9',
             borderLeft: '1px solid var(--color-border)',
@@ -305,45 +302,43 @@ export default function DayTimelineModal({
           </div>
         </div>
 
-        {/* Timeline body */}
-        <div style={{ flex: 1, overflow: 'auto' }}>
-          <div style={{ position: 'relative', height: totalHeight, minHeight: '100%' }}>
-            {/* Time ticks layer */}
-            {renderTimeTicks()}
+        {/* Timeline body — fills remaining space, no scroll */}
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          {/* Time ticks layer */}
+          {renderTimeTicks()}
 
-            {/* Columns container */}
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 58,
-              right: 0,
-              height: totalHeight,
-              display: 'flex',
-            }}>
-              {/* User column */}
-              <div
-                onClick={(e) => handleTimelineClick(e, 'user')}
-                style={{
-                  flex: 1,
-                  position: 'relative',
-                  borderLeft: '1px solid var(--color-border)',
-                  cursor: 'crosshair',
-                }}
-              >
-                {myEvents.map(renderEventBlock)}
-              </div>
-              {/* Partner column */}
-              <div
-                onClick={(e) => handleTimelineClick(e, 'partner')}
-                style={{
-                  flex: 1,
-                  position: 'relative',
-                  borderLeft: '1px solid var(--color-border)',
-                  cursor: 'crosshair',
-                }}
-              >
-                {partnerEvents.map(renderEventBlock)}
-              </div>
+          {/* Columns container */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            left: 52,
+            right: 0,
+            display: 'flex',
+          }}>
+            {/* User column */}
+            <div
+              onClick={handleTimelineClick}
+              style={{
+                flex: 1,
+                position: 'relative',
+                borderLeft: '1px solid var(--color-border)',
+                cursor: 'crosshair',
+              }}
+            >
+              {myEvents.map(renderEventBlock)}
+            </div>
+            {/* Partner column */}
+            <div
+              onClick={handleTimelineClick}
+              style={{
+                flex: 1,
+                position: 'relative',
+                borderLeft: '1px solid var(--color-border)',
+                cursor: 'crosshair',
+              }}
+            >
+              {partnerEvents.map(renderEventBlock)}
             </div>
           </div>
         </div>

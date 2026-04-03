@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/hooks/useAuth';
 import { useEvents } from '@/hooks/useEvents';
@@ -12,6 +11,7 @@ import EventHistoryModal from '@/components/EventHistoryModal';
 import DayTimelineModal from '@/components/DayTimelineModal';
 import CoupleLinkModal from '@/components/CoupleLinkModal';
 import ProfileMenu from '@/components/ProfileMenu';
+import SidebarMenu from '@/components/SidebarMenu';
 import CallyAssistant from '@/components/CallyAssistant';
 import { CallyEvent } from '@/types';
 import { addEvent, updateEvent, deleteEvent, resolveUserCouple } from '@/lib/firestore';
@@ -30,6 +30,7 @@ export default function CalendarPage() {
   const [selectedEvent, setSelectedEvent] = useState<CallyEvent | null>(null);
   const [showCoupleModal, setShowCoupleModal] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
 
   const coupleId = profile?.coupleId ?? null;
   const { events } = useEvents(coupleId || user?.uid || null);
@@ -72,8 +73,6 @@ export default function CalendarPage() {
   }
 
   if (!user) return null;
-
-  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
   /**
    * Day click from calendar grid:
@@ -136,46 +135,42 @@ export default function CalendarPage() {
       {/* Header */}
       <header style={{
         display: 'grid',
-        gridTemplateColumns: '1fr auto 1fr',
+        gridTemplateColumns: '48px 1fr 48px',
         alignItems: 'center',
-        padding: '8px 20px',
+        padding: '8px 12px',
         borderBottom: '1px solid var(--color-border)',
         background: 'var(--color-surface)',
-        gap: 8,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Link href="/about" style={{ textDecoration: 'none' }}>
-            <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-primary)' }}>Cally</h1>
-          </Link>
-          <span style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>{monthNames[month - 1]} {year}</span>
-        </div>
+        {/* Left: hamburger */}
+        <button
+          onClick={() => setShowSidebar(true)}
+          aria-label="Open menu"
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '4px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4,
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 36,
+            height: 36,
+          }}
+        >
+          <span style={{ display: 'block', width: 20, height: 2, background: 'var(--color-text)', borderRadius: 1 }} />
+          <span style={{ display: 'block', width: 20, height: 2, background: 'var(--color-text)', borderRadius: 1 }} />
+          <span style={{ display: 'block', width: 20, height: 2, background: 'var(--color-text)', borderRadius: 1 }} />
+        </button>
 
-        <span style={{
-          fontSize: '1.8rem',
-          fontStyle: 'italic',
-          fontFamily: "'Great Vibes', cursive",
-          letterSpacing: '0.03em',
-          background: 'linear-gradient(90deg, #1DB954, #a8f5c8, #1DB954)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          WebkitTextStroke: '0.5px rgba(192,192,192,0.7)',
-          whiteSpace: 'nowrap',
-        }}>
-          living together
-        </span>
+        {/* Center: Cally */}
+        <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-primary)', textAlign: 'center' }}>
+          Cally
+        </h1>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'flex-end' }}>
-          <button
-            className="btn-ghost"
-            onClick={() => setShowHistory(true)}
-            style={{ fontSize: '0.85rem', padding: '6px 12px' }}
-            title="View calendar history"
-          >
-            📋 History
-          </button>
-          <button className="btn-ghost" onClick={() => setShowCoupleModal(true)} style={{ fontSize: '0.85rem', padding: '6px 12px' }}>
-            💚 Pair Calendar
-          </button>
+        {/* Right: profile */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <ProfileMenu user={user} />
         </div>
       </header>
@@ -270,6 +265,14 @@ export default function CalendarPage() {
           onClose={() => setShowHistory(false)}
         />
       )}
+
+      {/* Sidebar drawer menu */}
+      <SidebarMenu
+        open={showSidebar}
+        onClose={() => setShowSidebar(false)}
+        onPairCalendar={() => setShowCoupleModal(true)}
+        onHistory={() => setShowHistory(true)}
+      />
     </div>
   );
 }
