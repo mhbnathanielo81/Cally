@@ -90,7 +90,7 @@ export default function DayTimelineModal({
   /** Render an event block positioned on the timeline using percentages */
   function renderEventBlock(ev: CallyEvent) {
     const startMins = timeToMinutes(ev.time);
-    const endMins = ev.endTime ? timeToMinutes(ev.endTime) : startMins + 30;
+    const endMins = ev.endTime ? timeToMinutes(ev.endTime) : startMins + 60;
     const duration = Math.max(endMins - startMins, 5);
     const topPct = minutesToPercent(startMins);
     const heightPct = (duration / totalMinutes) * 100;
@@ -103,21 +103,23 @@ export default function DayTimelineModal({
         style={{
           position: 'absolute',
           top: `${topPct}%`,
-          left: 4,
-          right: 4,
-          height: `${Math.max(heightPct, 0.8)}%`,
+          left: 3,
+          right: 3,
+          height: `${Math.max(heightPct, 1.5)}%`,
           background: color,
           border: 'none',
-          borderRadius: 4,
-          padding: '2px 6px',
+          borderRadius: 3,
+          padding: '0 6px',
           cursor: 'pointer',
           overflow: 'hidden',
           textAlign: 'left',
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'flex-start',
+          justifyContent: 'center',
           opacity: 0.9,
           transition: 'opacity 0.15s',
+          boxSizing: 'border-box',
+          margin: 0,
         }}
         onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
         onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.9')}

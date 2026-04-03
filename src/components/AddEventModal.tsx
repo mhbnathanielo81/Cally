@@ -108,7 +108,7 @@ export default function AddEventModal({ coupleId, createdBy, createdByName, day,
             <div className="field" style={{ flex: 1 }}>
               <label>End Time <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}>(optional)</span></label>
               <select value={endTime} onChange={(e) => setEndTime(e.target.value)}>
-                <option value="">— ({advanceTime(time, 30)})</option>
+                <option value="">— ({advanceTime(time, 60)})</option>
                 {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
