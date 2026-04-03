@@ -90,7 +90,7 @@ export default function DayTimelineModal({
   /** Render an event block positioned on the timeline using percentages */
   function renderEventBlock(ev: CallyEvent) {
     const startMins = timeToMinutes(ev.time);
-    const endMins = ev.endTime ? timeToMinutes(ev.endTime) : startMins + 15;
+    const endMins = ev.endTime ? timeToMinutes(ev.endTime) : startMins + 30;
     const duration = Math.max(endMins - startMins, 5);
     const topPct = minutesToPercent(startMins);
     const heightPct = (duration / totalMinutes) * 100;
@@ -149,6 +149,7 @@ export default function DayTimelineModal({
     for (let m = viewStart; m <= viewEnd; m += TICK_15) {
       const topPct = minutesToPercent(m);
       const isHour = m % 60 === 0;
+      const isHalfHour = m % 30 === 0 && !isHour;
       ticks.push(
         <div key={m} style={{
           position: 'absolute',
@@ -158,23 +159,42 @@ export default function DayTimelineModal({
           display: 'flex',
           alignItems: 'flex-start',
         }}>
-          <span style={{
-            width: 48,
-            fontSize: '0.6rem',
-            color: isHour ? 'var(--color-muted)' : 'transparent',
-            textAlign: 'right',
-            paddingRight: 4,
-            lineHeight: 1,
-            transform: 'translateY(-4px)',
+          {/* Time label + tick mark area */}
+          <div style={{
+            width: 52,
             flexShrink: 0,
-            userSelect: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            gap: 2,
           }}>
-            {isHour ? minutesToTime(m) : ''}
-          </span>
+            <span style={{
+              fontSize: '0.6rem',
+              color: isHour ? 'var(--color-muted)' : 'transparent',
+              textAlign: 'right',
+              lineHeight: 1,
+              transform: 'translateY(-1px)',
+              userSelect: 'none',
+              flex: 1,
+            }}>
+              {isHour ? minutesToTime(m) : ''}
+            </span>
+            {/* Tick mark — small for 30-min, none for 15-min */}
+            {(isHour || isHalfHour) && (
+              <span style={{
+                display: 'block',
+                width: isHour ? 6 : 4,
+                height: 1,
+                background: isHour ? 'var(--color-muted)' : 'rgba(255,255,255,0.15)',
+                flexShrink: 0,
+              }} />
+            )}
+          </div>
+          {/* Grid line across columns */}
           <div style={{
             flex: 1,
-            height: isHour ? 1 : 0.5,
-            background: isHour ? 'var(--color-border)' : 'rgba(255,255,255,0.04)',
+            height: isHour ? 1 : isHalfHour ? 0.5 : 0,
+            background: isHour ? 'var(--color-border)' : isHalfHour ? 'rgba(255,255,255,0.06)' : 'transparent',
           }} />
         </div>,
       );
@@ -303,7 +323,9 @@ export default function DayTimelineModal({
         </div>
 
         {/* Timeline body — fills remaining space, no scroll */}
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden', padding: '8px 0' }}>
+          {/* Inner container that fills the padded area */}
+          <div style={{ position: 'relative', width: '100%', height: '100%' }}>
           {/* Time ticks layer */}
           {renderTimeTicks()}
 
@@ -340,6 +362,7 @@ export default function DayTimelineModal({
             >
               {partnerEvents.map(renderEventBlock)}
             </div>
+          </div>
           </div>
         </div>
       </div>
