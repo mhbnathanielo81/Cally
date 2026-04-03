@@ -9,7 +9,7 @@ import MonthSidebar from '@/components/MonthSidebar';
 import AddEventModal from '@/components/AddEventModal';
 import EventDetailModal from '@/components/EventDetailModal';
 import EventHistoryModal from '@/components/EventHistoryModal';
-import DayDetailModal from '@/components/DayDetailModal';
+import DayTimelineModal from '@/components/DayTimelineModal';
 import CoupleLinkModal from '@/components/CoupleLinkModal';
 import ProfileMenu from '@/components/ProfileMenu';
 import CallyAssistant from '@/components/CallyAssistant';
@@ -24,8 +24,9 @@ export default function CalendarPage() {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [timelineDay, setTimelineDay] = useState<number | null>(null);
   const [addEventDay, setAddEventDay] = useState<number | null>(null);
+  const [addEventStartTime, setAddEventStartTime] = useState<string | undefined>(undefined);
   const [selectedEvent, setSelectedEvent] = useState<CallyEvent | null>(null);
   const [showCoupleModal, setShowCoupleModal] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -34,9 +35,6 @@ export default function CalendarPage() {
   const { events } = useEvents(coupleId || user?.uid || null);
   const { couple } = useCouple(coupleId);
 
-  // Self-healing: detect and fix mismatched couple associations.
-  // This handles the case where a user's coupleId points to a stale pending
-  // couple while they're actually linked in a different couple document.
   const resolutionRan = useRef(false);
   useEffect(() => {
     if (!user || resolutionRan.current) return;
@@ -46,12 +44,10 @@ export default function CalendarPage() {
 
   const currentUserName = profile?.displayName ?? user?.displayName ?? '';
 
-  // Redirect unauthenticated users
   useEffect(() => {
     if (!authLoading && !user) router.push('/');
   }, [user, authLoading, router]);
 
-  // Request notification permission
   useEffect(() => {
     if (user) {
       requestNotificationPermission(user.uid);
@@ -79,14 +75,18 @@ export default function CalendarPage() {
 
   const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-  /** Open day-detail view for any authenticated user. */
-  function handleDayClick(d: number) {
-    setSelectedDay(d);
-  }
-
-  /** Open add-event modal for any authenticated user. */
-  function handleAddEventClick(d: number) {
-    setAddEventDay(d);
+  /**
+   * Day click from calendar grid:
+   * - Has events → open timeline modal
+   * - No events → open add event modal directly
+   */
+  function handleDayClick(d: number, hasEvents: boolean) {
+    if (hasEvents) {
+      setTimelineDay(d);
+    } else {
+      setAddEventStartTime(undefined);
+      setAddEventDay(d);
+    }
   }
 
   /** Create an event from Cally AI chat. */
@@ -96,6 +96,7 @@ export default function CalendarPage() {
     month: number;
     year: number;
     time: string;
+    endTime?: string;
     location: string;
     notes: string;
     type: 'event' | 'dinner';
@@ -132,7 +133,7 @@ export default function CalendarPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      {/* Header — three-column layout so "living together" sits centered at the very top */}
+      {/* Header */}
       <header style={{
         display: 'grid',
         gridTemplateColumns: '1fr auto 1fr',
@@ -142,7 +143,6 @@ export default function CalendarPage() {
         background: 'var(--color-surface)',
         gap: 8,
       }}>
-        {/* Left: Cally + month */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Link href="/about" style={{ textDecoration: 'none' }}>
             <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-primary)' }}>Cally</h1>
@@ -150,7 +150,6 @@ export default function CalendarPage() {
           <span style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>{monthNames[month - 1]} {year}</span>
         </div>
 
-        {/* Centre: living together */}
         <span style={{
           fontSize: '1.8rem',
           fontStyle: 'italic',
@@ -165,7 +164,6 @@ export default function CalendarPage() {
           living together
         </span>
 
-        {/* Right: History + Pair Calendar + ProfileMenu */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'flex-end' }}>
           <button
             className="btn-ghost"
@@ -201,8 +199,6 @@ export default function CalendarPage() {
           events={events}
           currentUid={user.uid}
           onDayClick={handleDayClick}
-          onAddEventClick={handleAddEventClick}
-          onEventClick={(ev) => setSelectedEvent(ev)}
         />
         <MonthSidebar
           selectedMonth={month}
@@ -220,19 +216,28 @@ export default function CalendarPage() {
       </div>
 
       {/* Modals */}
-      {selectedDay && (
-        <DayDetailModal
-          day={selectedDay}
+
+      {/* Day Timeline — full-screen view of a day's events */}
+      {timelineDay !== null && (
+        <DayTimelineModal
+          day={timelineDay}
           month={month}
           year={year}
           events={events}
           currentUid={user.uid}
-          onClose={() => setSelectedDay(null)}
-          onAddEvent={() => { setSelectedDay(null); setAddEventDay(selectedDay); }}
-          onEventClick={(ev) => setSelectedEvent(ev)}
+          couple={couple}
+          currentUserName={currentUserName}
+          onClose={() => setTimelineDay(null)}
+          onEventClick={(ev) => { setSelectedEvent(ev); }}
+          onAddEvent={(startTime) => {
+            setAddEventStartTime(startTime);
+            setAddEventDay(timelineDay);
+          }}
         />
       )}
-      {addEventDay && (
+
+      {/* Add Event */}
+      {addEventDay !== null && (
         <AddEventModal
           coupleId={coupleId ?? user.uid}
           createdBy={user.uid}
@@ -240,10 +245,13 @@ export default function CalendarPage() {
           day={addEventDay}
           month={month}
           year={year}
-          onClose={() => setAddEventDay(null)}
-          onSaved={() => setAddEventDay(null)}
+          initialStartTime={addEventStartTime}
+          onClose={() => { setAddEventDay(null); setAddEventStartTime(undefined); }}
+          onSaved={() => { setAddEventDay(null); setAddEventStartTime(undefined); }}
         />
       )}
+
+      {/* Event Detail / Edit */}
       {selectedEvent && (
         <EventDetailModal
           event={selectedEvent}
@@ -252,6 +260,7 @@ export default function CalendarPage() {
           onClose={() => setSelectedEvent(null)}
         />
       )}
+
       {showCoupleModal && (
         <CoupleLinkModal user={user} couple={couple} onLinked={handleCoupleLinked} onClose={() => setShowCoupleModal(false)} />
       )}

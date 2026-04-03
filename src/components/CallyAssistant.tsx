@@ -8,6 +8,7 @@ interface NewEventData {
   month: number;
   year: number;
   time: string;
+  endTime?: string;
   location: string;
   notes: string;
   type: 'event' | 'dinner';

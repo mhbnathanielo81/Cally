@@ -9,12 +9,10 @@ interface Props {
   year: number;
   events: CallyEvent[];
   currentUid: string;
-  onDayClick: (day: number) => void;
-  onAddEventClick: (day: number) => void;
-  onEventClick: (event: CallyEvent) => void;
+  onDayClick: (day: number, hasEvents: boolean) => void;
 }
 
-export default function CalendarGrid({ month, year, events, currentUid, onDayClick, onAddEventClick, onEventClick }: Props) {
+export default function CalendarGrid({ month, year, events, currentUid, onDayClick }: Props) {
   const [hoveredDay, setHoveredDay] = useState<number | null>(null);
 
   const { days, startOffset } = useMemo(() => {
@@ -70,10 +68,11 @@ export default function CalendarGrid({ month, year, events, currentUid, onDayCli
           const dayEvents = eventsByDay[day] ?? [];
           const isToday = isCurrentMonth && day === today.getDate();
           const isHovered = hoveredDay === day;
+          const hasEvents = dayEvents.length > 0;
           return (
             <div
               key={day}
-              onClick={() => onDayClick(day)}
+              onClick={() => onDayClick(day, hasEvents)}
               onMouseEnter={() => setHoveredDay(day)}
               onMouseLeave={() => setHoveredDay(null)}
               style={{
@@ -104,42 +103,11 @@ export default function CalendarGrid({ month, year, events, currentUid, onDayCli
                 {day}
               </span>
 
-              {/* Hover "+" add button */}
-              {isHovered && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onAddEventClick(day); }}
-                  title="Add event"
-                  style={{
-                    position: 'absolute',
-                    top: 4,
-                    right: 4,
-                    width: 22,
-                    height: 22,
-                    borderRadius: '50%',
-                    background: 'var(--color-primary)',
-                    border: 'none',
-                    color: '#000',
-                    fontSize: '1rem',
-                    lineHeight: '22px',
-                    textAlign: 'center',
-                    cursor: 'pointer',
-                    padding: 0,
-                    fontWeight: 700,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  +
-                </button>
-              )}
-
-              {/* Event pills */}
+              {/* Event pills (display only — clicking the day opens the timeline) */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4, minWidth: 0 }}>
                 {dayEvents.slice(0, 3).map((ev) => (
-                  <button
+                  <div
                     key={ev.id}
-                    onClick={(e) => { e.stopPropagation(); onEventClick(ev); }}
                     style={{
                       background: getEventColor(ev.createdBy, currentUid, ev.type),
                       color: '#000',
@@ -154,18 +122,13 @@ export default function CalendarGrid({ month, year, events, currentUid, onDayCli
                       width: '100%',
                       minWidth: 0,
                       fontWeight: 600,
-                      display: 'block',
-                      cursor: 'pointer',
                     }}
                   >
                     {ev.title}
-                  </button>
+                  </div>
                 ))}
                 {dayEvents.length > 3 && (
-                  <span
-                    onClick={(e) => { e.stopPropagation(); onDayClick(day); }}
-                    style={{ fontSize: '0.65rem', color: 'var(--color-muted)', paddingLeft: 4, cursor: 'pointer' }}
-                  >
+                  <span style={{ fontSize: '0.65rem', color: 'var(--color-muted)', paddingLeft: 4 }}>
                     +{dayEvents.length - 3} more
                   </span>
                 )}

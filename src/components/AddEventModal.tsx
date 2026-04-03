@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { addEvent } from '@/lib/firestore';
 
 const TIME_OPTIONS: string[] = [];
@@ -11,6 +11,25 @@ for (let h = 0; h < 24; h++) {
   }
 }
 
+/** Advance a "H:MM AM/PM" time string by `mins` minutes. */
+function advanceTime(time: string, mins: number): string {
+  const match = time.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!match) return time;
+  let h = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10);
+  const period = match[3].toUpperCase();
+  if (period === 'PM' && h !== 12) h += 12;
+  if (period === 'AM' && h === 12) h = 0;
+  let total = h * 60 + m + mins;
+  if (total >= 1440) total -= 1440;
+  if (total < 0) total += 1440;
+  const newH24 = Math.floor(total / 60) % 24;
+  const newM = total % 60;
+  const newPeriod = newH24 < 12 ? 'AM' : 'PM';
+  const newH12 = newH24 === 0 ? 12 : newH24 > 12 ? newH24 - 12 : newH24;
+  return `${newH12}:${newM.toString().padStart(2, '0')} ${newPeriod}`;
+}
+
 interface Props {
   coupleId: string;
   createdBy: string;
@@ -18,17 +37,24 @@ interface Props {
   day: number;
   month: number;
   year: number;
+  initialStartTime?: string;
   onClose: () => void;
   onSaved: () => void;
 }
 
-export default function AddEventModal({ coupleId, createdBy, createdByName, day, month, year, onClose, onSaved }: Props) {
+export default function AddEventModal({ coupleId, createdBy, createdByName, day, month, year, initialStartTime, onClose, onSaved }: Props) {
   const [title, setTitle] = useState('');
-  const [time, setTime] = useState('12:00 PM');
+  const [time, setTime] = useState(initialStartTime || '12:00 PM');
+  const [endTime, setEndTime] = useState('');
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // When start time changes, clear end time so default 15-min applies
+  useEffect(() => {
+    setEndTime('');
+  }, [time]);
 
   const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -37,8 +63,8 @@ export default function AddEventModal({ coupleId, createdBy, createdByName, day,
     if (!title.trim()) { setError('Title is required.'); return; }
     setSaving(true);
     try {
-      // Build payload without undefined values — Firestore rejects undefined fields
       const payload: Parameters<typeof addEvent>[2] = { title: title.trim(), time, day, month, year };
+      if (endTime) payload.endTime = endTime;
       if (location.trim()) payload.location = location.trim();
       if (notes.trim()) payload.notes = notes.trim();
       await addEvent(coupleId, createdBy, payload, { changedByName: createdByName ?? '' });
@@ -72,11 +98,20 @@ export default function AddEventModal({ coupleId, createdBy, createdByName, day,
               maxLength={50}
             />
           </div>
-          <div className="field">
-            <label>Time</label>
-            <select value={time} onChange={(e) => setTime(e.target.value)}>
-              {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div className="field" style={{ flex: 1 }}>
+              <label>Start Time *</label>
+              <select value={time} onChange={(e) => setTime(e.target.value)}>
+                {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="field" style={{ flex: 1 }}>
+              <label>End Time <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}>(optional)</span></label>
+              <select value={endTime} onChange={(e) => setEndTime(e.target.value)}>
+                <option value="">— ({advanceTime(time, 15)})</option>
+                {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
           </div>
           <div className="field">
             <label>Location <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}>(optional)</span></label>

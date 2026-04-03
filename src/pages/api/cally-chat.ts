@@ -55,6 +55,7 @@ If the user asks to ADD, CREATE, or SCHEDULE an event, you must respond with a J
     "month": 3,
     "year": 2026,
     "time": "7:00 PM",
+    "endTime": "8:00 PM",
     "location": "Location or empty string",
     "notes": "Notes or empty string",
     "type": "event"
@@ -67,6 +68,7 @@ Rules for event creation:
 - "month" must be 1-indexed (1 = January, 12 = December).
 - "type" should be "dinner" if the event is clearly a dinner or restaurant reservation, otherwise "event".
 - "time" should use "H:MM AM/PM" format. If no time specified, use "12:00 PM".
+- "endTime" is optional. Use "H:MM AM/PM" format. If the user specifies a duration or end time, include it. If not specified, omit the field or use empty string.
 - If the user says a day of the week (e.g. "Friday"), calculate the actual date using today's date. Always use the NEXT occurrence of that day (not past).
 - If the user says "tomorrow", "next Tuesday", "this Saturday", etc., resolve it to an actual date.
 - Location and notes should be empty strings if not specified.

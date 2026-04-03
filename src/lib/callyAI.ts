@@ -16,6 +16,7 @@ export interface CallyResponse {
     month: number;
     year: number;
     time: string;
+    endTime?: string;
     location: string;
     notes: string;
     type: 'event' | 'dinner';
@@ -26,6 +27,7 @@ export interface CallyResponse {
     month: number;
     year: number;
     time: string;
+    endTime?: string;
     location: string;
     notes: string;
     type: 'event' | 'dinner';
@@ -34,7 +36,7 @@ export interface CallyResponse {
     eventTitle: string;
     changes: Partial<{
       title: string; day: number; month: number; year: number;
-      time: string; location: string; notes: string; type: 'event' | 'dinner';
+      time: string; endTime: string; location: string; notes: string; type: 'event' | 'dinner';
     }>;
   };
   deleteEventTitle?: string;
@@ -75,6 +77,7 @@ function serializeEvents(
         weekday: 'long',
       });
       const time = e.time || 'no time set';
+      const endTime = e.endTime ? ` — ${e.endTime}` : '';
       const location = e.location ? ` | Location: ${e.location}` : '';
       const notes = e.notes ? ` | Notes: ${e.notes}` : '';
       const type = e.type === 'dinner' ? ' | Type: dinner reservation' : '';
@@ -87,7 +90,7 @@ function serializeEvents(
         if (e.createdBy === couple.user2) addedBy = couple.user2DisplayName || 'partner';
       }
 
-      return `- ${date} (${dayOfWeek}) | ${time} | "${e.title}"${location}${notes}${type} | Added by: ${addedBy}`;
+      return `- ${date} (${dayOfWeek}) | ${time}${endTime} | "${e.title}"${location}${notes}${type} | Added by: ${addedBy}`;
     })
     .join('\n');
 }

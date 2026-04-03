@@ -26,14 +26,14 @@ export default function EventDetailModal({ event, currentUid, currentUserName = 
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(event.title);
   const [time, setTime] = useState(event.time);
+  const [endTime, setEndTime] = useState(event.endTime ?? '');
   const [location, setLocation] = useState(event.location ?? '');
   const [notes, setNotes] = useState(event.notes ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const color = getEventColor(event.createdBy, currentUid, event.type);
-  // Both partners in a shared calendar can edit and delete events
-  const canEdit = true;
+  const canEdit = event.createdBy === currentUid;
   const canDelete = true;
 
   const handleSave = async (e: React.FormEvent) => {
@@ -41,12 +41,17 @@ export default function EventDetailModal({ event, currentUid, currentUserName = 
     if (!title.trim()) { setError('Title is required.'); return; }
     setSaving(true);
     try {
-      await updateEvent(event.id, { title: title.trim(), time, location: location.trim() || undefined, notes: notes.trim() || undefined }, {
+      await updateEvent(event.id, {
+        title: title.trim(),
+        time,
+        endTime: endTime || undefined,
+        location: location.trim() || undefined,
+        notes: notes.trim() || undefined,
+      }, {
         changedBy: currentUid,
         changedByName: currentUserName,
         previousEvent: event,
       });
-      // Close the modal so the refreshed event data is shown from the events list
       onClose();
     } catch {
       setError('Failed to update event.');
@@ -64,6 +69,10 @@ export default function EventDetailModal({ event, currentUid, currentUserName = 
     }
   };
 
+  const timeDisplay = event.endTime
+    ? `${event.time} — ${event.endTime}`
+    : event.time;
+
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -72,7 +81,9 @@ export default function EventDetailModal({ event, currentUid, currentUserName = 
         <h2 style={{ paddingLeft: 16 }}>{editing ? 'Edit Event' : event.title}</h2>
         {!editing && (
           <div style={{ paddingLeft: 16 }}>
-            <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem', margin: '0 0 8px' }}>{MONTH_NAMES[event.month - 1]} {event.day}, {event.year} · {event.time}</p>
+            <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem', margin: '0 0 8px' }}>
+              {MONTH_NAMES[event.month - 1]} {event.day}, {event.year} · {timeDisplay}
+            </p>
             {event.location && <p style={{ margin: '0 0 8px', fontSize: '0.9rem' }}>📍 {event.location}</p>}
             {event.notes && <p style={{ margin: '0 0 8px', fontSize: '0.9rem', color: 'var(--color-muted)' }}>{event.notes}</p>}
             <div className="modal-actions" style={{ paddingLeft: 0 }}>
@@ -89,11 +100,20 @@ export default function EventDetailModal({ event, currentUid, currentUserName = 
               <label>Title *</label>
               <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
             </div>
-            <div className="field">
-              <label>Time</label>
-              <select value={time} onChange={(e) => setTime(e.target.value)}>
-                {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <div className="field" style={{ flex: 1 }}>
+                <label>Start Time</label>
+                <select value={time} onChange={(e) => setTime(e.target.value)}>
+                  {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="field" style={{ flex: 1 }}>
+                <label>End Time <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}>(optional)</span></label>
+                <select value={endTime} onChange={(e) => setEndTime(e.target.value)}>
+                  <option value="">—</option>
+                  {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
             </div>
             <div className="field">
               <label>Location</label>

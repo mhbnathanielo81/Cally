@@ -62,7 +62,8 @@ export function describeEvent(
 ): string {
   const who = creatorLabel(e.createdBy, currentUid, couple, currentUserName);
   const loc = e.location ? ` @ ${e.location}` : '';
-  return `• ${e.title}${loc} — ${formatDate(e)} ${formatTime(e.time)} (added by ${who})`;
+  const timeStr = e.endTime ? `${formatTime(e.time)}–${formatTime(e.endTime)}` : formatTime(e.time);
+  return `• ${e.title}${loc} — ${formatDate(e)} ${timeStr} (added by ${who})`;
 }
 
 // ── location extraction ───────────────────────────────────────────────────────

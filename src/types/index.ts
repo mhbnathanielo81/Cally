@@ -32,6 +32,7 @@ export interface CallyEvent {
   coupleId: string;
   title: string;
   time: string;
+  endTime?: string;
   location?: string;
   notes?: string;
   day: number;
@@ -46,6 +47,7 @@ export interface CallyEvent {
 export interface AddEventPayload {
   title: string;
   time: string;
+  endTime?: string;
   location?: string;
   notes?: string;
   day: number;
